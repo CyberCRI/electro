@@ -63,7 +63,7 @@ class BaseStorage:
         *,
         chat: typing.Union[str, int, None] = None,
         user: typing.Union[str, int, None] = None,
-    ) -> (typing.Union[str, int], typing.Union[str, int]):
+    ) -> typing.Tuple[typing.Union[str, int]]:
         """
         In all storage's methods chat or user is always required.
         If one of them is not provided, you have to set missing value based on the provided one.
