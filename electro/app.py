@@ -17,7 +17,7 @@ app = FastAPI(
 
 
 @app.post("/message")
-async def process_message(message: types.Message) -> list[types.MessageToSend] | None:
+async def process_message(message: types.Message) -> types.MessageToSend | None:
     """Process the message."""
 
     return await global_flow_manager.on_message(message)

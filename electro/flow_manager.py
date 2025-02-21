@@ -338,8 +338,6 @@ class FlowManager(ContextInstanceMixin):
             # Check all the triggers
             if await flow.check_triggers(flow_connector, scope=scope):
                 return await flow.run(flow_connector)
-                # break
-
         else:
             # Check if it's not something that shouldn't be handled by the flows
             if (
