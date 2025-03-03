@@ -321,7 +321,7 @@ class FlowManager(ContextInstanceMixin):
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @fail_safely
-    async def _dispatch(self, flow_connector: FlowConnector):
+    async def _dispatch(self, flow_connector: FlowConnector) -> list[types.MessageToSend] | None:
         """Dispatch the flow."""
         # Create the User and Channel records if they don't exist
         await self._create_user_and_channel(flow_connector.user, flow_connector.channel)
@@ -338,8 +338,8 @@ class FlowManager(ContextInstanceMixin):
         for flow in self.flows:
             # Check all the triggers
             if await flow.check_triggers(flow_connector, scope=scope):
-                await flow.run(flow_connector)
-                break
+                return await flow.run(flow_connector)
+                # break
 
         else:
             # Check if it's not something that shouldn't be handled by the flows
@@ -412,7 +412,7 @@ class FlowManager(ContextInstanceMixin):
                     )
                     return  # Do not raise an exception, as it's not an error
 
-    async def dispatch(self, flow_connector: FlowConnector):
+    async def dispatch(self, flow_connector: FlowConnector) -> list[types.MessageToSend] | None:
         """Dispatch the flow."""
         # Set the current flow connector
         FlowConnector.set_current(flow_connector)
@@ -420,7 +420,7 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, message: types.Message):
+    async def on_message(self, message: types.Message) -> list[Message] | None:
         """Handle the messages sent by the users."""
 
         # Save the message to the database
@@ -428,7 +428,7 @@ class FlowManager(ContextInstanceMixin):
 
         # Ignore the messages sent by the bots
         if message.author.bot:
-            return
+            return None
 
         # Get the user state and data
         # TODO: [20.08.2023 by Mykola] Use context manager for this

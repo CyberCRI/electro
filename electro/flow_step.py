@@ -13,8 +13,6 @@ from typing import Any
 import discord
 from openai import NOT_GIVEN
 
-from types_ import Channel, MessageToSend
-
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
 from .contrib.views import BaseView, ViewStepFinished
 from .flow_connector import FlowConnectorEvents
@@ -25,6 +23,7 @@ from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_chan
 from .toolkit.loguru_logging import logger
 from .toolkit.openai_client import async_openai_client
 from .toolkit.templated_i18n import TemplatedString
+from .types_ import Channel, MessageToSend
 
 if typing.TYPE_CHECKING:
     from .flow import FlowConnector
@@ -45,7 +44,7 @@ class BaseFlowStep(ABC):
     _testing: bool = False
 
     @abstractmethod
-    async def run(self, connector: FlowConnector):
+    async def run(self, connector: FlowConnector) -> list[MessageToSend] | None:
         """Run the `BaseFlowStep`. Called when the `BaseFlowStep` is started."""
         raise NotImplementedError
 
@@ -265,11 +264,11 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         self,
         connector: FlowConnector,
         channel_to_send_to: Channel | BaseSubstitution | None = None,
-    ) -> MessageToSend:
+    ) -> list[MessageToSend] | None:
         """Run the `BaseFlowStep`."""
 
         message: MessageToSend = await self.send_message(
-            connector, self.message, channel=channel_to_send_to, view=self.view
+            connector, self.message, channel=channel_to_send_to or connector.channel, view=self.view
         )
 
         if self.non_blocking:
@@ -277,7 +276,8 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
 
             raise FlowStepDone()
 
-        return message
+        # TODO: [2025-03-03 by Mykola] Allow sending multiple messages
+        return [message]
 
     async def respond(self, connector: FlowConnector) -> discord.Message:
         """Respond to the user."""
