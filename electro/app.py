@@ -5,6 +5,7 @@ from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
 from .flow_manager import global_flow_manager
+from .routes import files
 from .toolkit.tortoise_orm import get_tortoise_config
 
 app = FastAPI(
@@ -22,6 +23,9 @@ async def process_message(message: types.Message) -> list[types.MessageToSend] |
 
     return await global_flow_manager.on_message(message)
 
+
+# Register routes
+app.include_router(files.router)
 
 # region Register Tortoise
 register_tortoise(
