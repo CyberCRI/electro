@@ -7,6 +7,7 @@ from abc import ABC, ABCMeta, abstractmethod
 
 from stringcase import snakecase
 
+from . import types_ as types
 from .contrib.storage_buckets import BaseStorageBucket, BaseStorageBucketElement
 from .flow_connector import FlowConnector, FlowConnectorEvents
 from .flow_step import BaseFlowStep, FlowStepDone
@@ -142,12 +143,16 @@ class BaseFlow(ABC, metaclass=FlowMeta):
         return await self.resolve_iterables(connector)
 
     @abstractmethod
-    async def step(self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None):
+    async def step(
+        self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
+    ) -> list[types.MessageToSend] | None:
         """Process the response in the current step of the `Flow`."""
         raise NotImplementedError
 
     @abstractmethod
-    async def run(self, connector: FlowConnector, upper_level_state: str | None = None):
+    async def run(
+        self, connector: FlowConnector, upper_level_state: str | None = None
+    ) -> list[types.MessageToSend] | None:
         """Start the `Flow`."""
         raise NotImplementedError
 
@@ -214,7 +219,9 @@ class Flow(BaseFlow):
         """Update the connector before running the `Flow`."""
         return connector
 
-    async def run(self, connector: FlowConnector, upper_level_state: str | None = None):
+    async def run(
+        self, connector: FlowConnector, upper_level_state: str | None = None
+    ) -> list[types.MessageToSend] | None:
         """Start the `Flow`."""
         # Make sure there are steps in the `Flow`
         if not self._steps:
@@ -236,7 +243,9 @@ class Flow(BaseFlow):
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @forbid_concurrent_execution()
     # @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
-    async def step(self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None):
+    async def step(
+        self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
+    ) -> list[types.MessageToSend] | None:
         """
         Process the response in the current step of the `Flow`.
 

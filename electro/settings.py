@@ -25,11 +25,6 @@ class Settings(BaseSettings):
     DO_USE_FILE_LOGS: bool = True
     DO_USE_COMMAND_ALIASES: bool = False
 
-    # Discord API credentials
-    # TODO: [06.03.2024 by Mykola] Do not let it be `None`. It's `None` only because we want to let `spinx` import it
-    #  while building the documentation.
-    DISCORD_BOT_TOKEN: str | None = None
-
     # Bot settings
     BOT_COMMAND_PREFIX: str = "!"
     BOT_LANGUAGE: str = "en"  # Should mirror the `DEFAULT_LOCALE` setting. User in the Python code

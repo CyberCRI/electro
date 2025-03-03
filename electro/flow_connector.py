@@ -12,6 +12,7 @@ from discord.ext import commands
 from ._common import ContextInstanceMixin
 from .models import Interaction, Message
 from .storage import ChannelData, UserData
+from .types_ import Channel, User
 
 if TYPE_CHECKING:
     from electro import FlowManager
@@ -41,8 +42,8 @@ class FlowConnector(ContextInstanceMixin):
 
     event: FlowConnectorEvents
 
-    user: discord.User | None
-    channel: discord.TextChannel | None
+    user: User | None
+    channel: Channel | None
 
     user_state: str | None
     user_data: UserData

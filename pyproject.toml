@@ -24,6 +24,7 @@ py-cord = {git = "https://github.com/mykolasolodukha/pycord.git", rev = "d8070a9
 aioboto3 = "^13.1.1"
 azure-storage-blob = "^12.23.1"
 azure-identity = "^1.18.0"
+fastapi = {extras = ["standard"], version = "^0.115.5"}
 
 
 [tool.poetry.group.dev.dependencies]
