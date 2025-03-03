@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from enums import ChannelType, SupportedPlatforms
+from .enums import ChannelType, SupportedPlatforms
 
 
 class ElectroBaseModel(BaseModel):

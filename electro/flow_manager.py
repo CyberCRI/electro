@@ -5,11 +5,10 @@ from __future__ import annotations
 import typing
 from collections import defaultdict
 
-from enums import ChannelType
-
 from . import types_ as types
 from ._common import ContextInstanceMixin
 from .bot import bot as global_bot
+from .enums import ChannelType
 from .exceptions import EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents

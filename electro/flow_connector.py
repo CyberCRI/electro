@@ -9,11 +9,10 @@ from typing import Any, TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from types_ import Channel, User
-
 from ._common import ContextInstanceMixin
 from .models import Interaction, Message
 from .storage import ChannelData, UserData
+from .types_ import Channel, User
 
 if TYPE_CHECKING:
     from electro import FlowManager
