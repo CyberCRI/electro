@@ -250,12 +250,11 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         )
 
         # view_to_sent = await view.get_or_create_for_connector(connector, from_step_run=True) if view else None
-
-        return MessageToSend(
-            content=message,
-            channel=channel_to_send_to,
-            # files=files or None,
-            # view=view_to_sent,
+        await connector.interface.send_json(
+            {
+                "message": message,
+                "to": channel_to_send_to.name,
+            }
         )
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
@@ -264,7 +263,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         self,
         connector: FlowConnector,
         channel_to_send_to: Channel | BaseSubstitution | None = None,
-    ) -> list[MessageToSend] | None:
+    ) -> MessageToSend | None:
         """Run the `BaseFlowStep`."""
 
         message: MessageToSend = await self.send_message(
@@ -277,7 +276,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
             raise FlowStepDone()
 
         # TODO: [2025-03-03 by Mykola] Allow sending multiple messages
-        return [message]
+        return message
 
     async def respond(self, connector: FlowConnector) -> discord.Message:
         """Respond to the user."""
