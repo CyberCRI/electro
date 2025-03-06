@@ -32,4 +32,4 @@ COPY . .
 USER app
 ENV PYTHONPATH="/app"
 
-CMD ["watchmedo", "auto-restart", "--pattern=*.py", "--recursive", "--", "python", "main.py"]
+CMD ["watchmedo", "auto-restart", "--pattern=*.py", "--recursive", "--", "python", "examples/test_flow.py"]
