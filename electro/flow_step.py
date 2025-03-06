@@ -253,7 +253,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         await connector.interface.send_json(
             {
                 "message": message,
-                "to": channel_to_send_to.name,
+                "to": channel_to_send_to.id,
             }
         )
 

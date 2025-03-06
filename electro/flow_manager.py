@@ -274,7 +274,7 @@ class FlowManager(ContextInstanceMixin):
         # Run the callbacks
         for callback in self._on_finish_callbacks:
             await callback(flow_connector)
-        await flow_connector.interface.stop_process(reason="end_of_flow")
+        return await flow_connector.interface.stop_process(reason="end_of_flow")
 
     async def _create_user_and_channel(
         self, user: types.User | None = None, channel: types.Channel | types.DMChannel | None = None

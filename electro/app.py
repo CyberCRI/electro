@@ -1,6 +1,7 @@
 """The API server that works as an endpoint for all the Electro Interfaces."""
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
@@ -24,12 +25,12 @@ async def process_message(message: types.Message) -> types.MessageToSend | None:
     return await global_flow_manager.on_message(message, manager)
 
 
-@app.websocket("websocket/client/{client_name}/user/{user_id}")
-async def websocket_endpoint(websocket: WebSocket):
+@app.websocket("/websocket/client/{client_name}/user/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: str):
     manager = WebSocketInterface()
     await manager.connect(websocket)
     try:
-        while True:
+        while websocket.application_state == WebSocketState.CONNECTED:
             data = await websocket.receive_json()
             data = types.Message.model_validate(data)
             await global_flow_manager.on_message(data, manager)
