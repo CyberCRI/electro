@@ -4,10 +4,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
-from .interfaces import WebSocketInterface, APIInterface
 from .flow_manager import global_flow_manager
+from .interfaces import APIInterface, WebSocketInterface
 from .toolkit.tortoise_orm import get_tortoise_config
-
 
 app = FastAPI(
     title="Electro API",

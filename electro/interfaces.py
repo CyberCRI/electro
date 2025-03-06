@@ -1,15 +1,17 @@
 from typing import Dict, Optional
+
 from fastapi import WebSocket
+
 from .toolkit.loguru_logging import logger
 
 
 class Interface:
     async def send_json(self, *args, **kwargs):
         raise NotImplementedError
-    
+
     async def stop_process(self, *args, **kwargs):
         raise NotImplementedError
-    
+
 
 class WebSocketInterface(Interface):
     """
@@ -18,6 +20,7 @@ class WebSocketInterface(Interface):
     On the server side, the WebSocketInterface is used to send messages to the client,
     to use
     """
+
     def __init__(self):
         self.interface: WebSocket | None = None
 
