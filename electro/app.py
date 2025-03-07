@@ -17,15 +17,18 @@ app = FastAPI(
     # redoc_url=None,
 )
 
+api_app = app
+websocket_app = app
 
-@app.post("/message")
+
+@api_app.post("/message")
 async def process_message(message: types.Message) -> types.MessageToSend | None:
     """Process the message."""
     manager = APIInterface()
     return await global_flow_manager.on_message(message, manager)
 
 
-@app.websocket("/websocket/client/{client_name}/user/{user_id}")
+@websocket_app.websocket("/websocket/client/{client_name}/user/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: str):
     manager = WebSocketInterface()
     await manager.connect(websocket)
@@ -39,9 +42,7 @@ async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: st
 
 
 # region Register Tortoise
-register_tortoise(
-    app,
-    config=get_tortoise_config(),
-)
+register_tortoise(api_app, config=get_tortoise_config())
+register_tortoise(websocket_app, config=get_tortoise_config())
 
 # endregion

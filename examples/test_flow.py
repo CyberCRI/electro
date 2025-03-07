@@ -2,7 +2,7 @@
 
 import uvicorn
 
-from electro.app import app
+from electro.app import websocket_app
 from electro import Flow, MessageFlowStep
 from electro.extra.i18n_gettext import templated_gettext as _
 
@@ -26,4 +26,4 @@ global_flow_manager.add_flow(TestFlow())
 
 
 if __name__ == "__main__":
-    uvicorn.run(app=app, loop="asyncio", port=8000, host="0.0.0.0")
+    uvicorn.run(app=websocket_app, loop="asyncio", port=8000, host="0.0.0.0")

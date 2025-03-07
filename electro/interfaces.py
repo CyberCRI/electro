@@ -18,7 +18,7 @@ class WebSocketInterface(Interface):
     WebSocket Interface for the Electro framework.
 
     On the server side, the WebSocketInterface is used to send messages to the client,
-    to use
+    If you want to send a message to the client in a Flow, you can use the `send_json` method.
     """
 
     def __init__(self):
