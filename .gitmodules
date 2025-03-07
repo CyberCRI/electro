@@ -1,0 +1,3 @@
+[submodule "migrations/electro"]
+	path = migrations/electro
+	url = git@github.com:CyberCRI/electro-migrations.git
