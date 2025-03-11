@@ -2,6 +2,7 @@
 
 from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Optional
 
 from .toolkit.images_storage.storages_enums import StoragesIDs
 
@@ -88,6 +89,22 @@ class Settings(BaseSettings):
 
     GO_BACK_COMMAND: str = "_go_back"
     RELOAD_COMMAND: str = "_reload"
+
+    # File Storage Settings
+    FILE_STORAGE_SERVICE: str = "local"  # "local", "s3", or "azure"
+    MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
+    ALLOWED_FILE_TYPES: List[str] = ["image/*", "application/pdf", "text/*"]
+    LOCAL_STORAGE_PATH: str = "uploads"
+
+    # S3 Settings (for future use)
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_BUCKET_NAME: Optional[str] = None
+    AWS_REGION: Optional[str] = None
+
+    # Azure Settings (for future use)
+    AZURE_CONNECTION_STRING: Optional[str] = None
+    AZURE_CONTAINER_NAME: Optional[str] = None
 
     # Validate GO_BACK_COMMAND
     if GO_BACK_COMMAND.startswith(BOT_COMMAND_PREFIX):
