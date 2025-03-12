@@ -18,12 +18,17 @@ A framework for building bots, made for humans.
     ```shell
     cp .env.example .env
     # vi .env
+
+4. Extract and compile translations:
+    ```shell
+    make upload-locales
+    make update-locales
     ```
 
-4. Run the `TestFlow`:
+5. Run the `TestFlow`:
    ```shell
    poetry run python ./test_flow.py
    ```
 
-5. Check the API server @ http://localhost:8000/docs.
-6. Use one of the clients to connect the platforms: [Discord](https://github.com/CyberCRI/ikigai-discord-client).
+6. Check the API server @ http://localhost:8000/docs.
+7. Use one of the clients to connect the platforms: [Discord](https://github.com/CyberCRI/ikigai-discord-client).

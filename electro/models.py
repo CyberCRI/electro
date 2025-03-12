@@ -58,6 +58,13 @@ class User(BaseModel):
         """Return the string representation of the model."""
         return f"{self.username}#{self.discriminator}"
 
+    async def create_dm(self) -> Channel:
+        """
+        Create a DM channel with the user.
+        """
+        channel, _ = await Channel.get_or_create(id=self.id, defaults={"type": 1})
+        return channel
+
 
 class File(BaseModel):
     """The model for the file."""
