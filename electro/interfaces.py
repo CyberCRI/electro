@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 from fastapi import WebSocket
@@ -5,15 +6,20 @@ from fastapi import WebSocket
 from .toolkit.loguru_logging import logger
 
 
-class Interface:
+class BaseInterface(ABC):
+    """
+    Interface class for the Electro framework."""
+
+    @abstractmethod
     async def send_json(self, *args, **kwargs):
         raise NotImplementedError
 
+    @abstractmethod
     async def stop_process(self, *args, **kwargs):
         raise NotImplementedError
 
 
-class WebSocketInterface(Interface):
+class WebSocketInterface(BaseInterface):
     """
     WebSocket Interface for the Electro framework.
 
@@ -39,7 +45,7 @@ class WebSocketInterface(Interface):
         await self.interface.close(code, reason)
 
 
-class APIInterface(Interface):
+class APIInterface(BaseInterface):
     def __init__(self):
         self.messages = []
 

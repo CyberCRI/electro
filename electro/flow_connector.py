@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 from ._common import ContextInstanceMixin
-from .interfaces import Interface
+from .interfaces import BaseInterface
 from .models import Interaction, Message
 from .storage import ChannelData, UserData
 from .types_ import Channel, User
@@ -63,4 +63,4 @@ class FlowConnector(ContextInstanceMixin):
 
     extra_data: dict[str, Any] | None = None
 
-    interface: Interface | None = None
+    interface: BaseInterface | None = None

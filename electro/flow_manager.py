@@ -14,7 +14,7 @@ from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
 
 # from decorators import fail_safely
-from .interfaces import Interface
+from .interfaces import BaseInterface
 from .models import Channel, Interaction, Message, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
@@ -420,7 +420,7 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, message: types.Message, interface: Interface) -> list[Message] | None:
+    async def on_message(self, message: types.Message, interface: BaseInterface) -> list[Message] | None:
         """Handle the messages sent by the users."""
 
         # Save the message to the database

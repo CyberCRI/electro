@@ -21,21 +21,21 @@ app = FastAPI(
 @app.post("/message")
 async def process_message(message: types.Message) -> types.MessageToSend | None:
     """Process the message."""
-    manager = APIInterface()
-    return await global_flow_manager.on_message(message, manager)
+    interface = APIInterface()
+    return await global_flow_manager.on_message(message, interface)
 
 
 @app.websocket("/websocket/client/{client_name}/user/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: str):
-    manager = WebSocketInterface()
-    await manager.connect(websocket)
+    interface = WebSocketInterface()
+    await interface.connect(websocket)
     try:
         while websocket.application_state == WebSocketState.CONNECTED:
             data = await websocket.receive_json()
             data = types.Message.model_validate(data)
-            await global_flow_manager.on_message(data, manager)
+            await global_flow_manager.on_message(data, interface)
     except WebSocketDisconnect:
-        await manager.disconnect()
+        await interface.disconnect()
 
 
 # region Register Tortoise
