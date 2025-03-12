@@ -31,13 +31,7 @@ class User(ElectroBaseModel):
         """
         Return a DM channel with the user.
         """
-        return Channel(
-            id=self.id,
-            name=self.username,
-            type=ChannelType.private,
-            guild=None,
-            used_for="DM"
-        )
+        return Channel(id=self.id, name=self.username, type=ChannelType.private, guild=None, used_for="DM")
 
 
 class Guild(ElectroBaseModel):
