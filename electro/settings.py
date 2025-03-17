@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     BOT_LANGUAGE: str = "en"  # Should mirror the `DEFAULT_LOCALE` setting. User in the Python code
 
     # Postgres database credentials
-    DATABASE_URL: PostgresDsn | None
+    DATABASE_URL: PostgresDsn | None = None
     # if the `DATABASE_URL` is not set, then use the following credentials:
     POSTGRES_HOST: str | None = None
     POSTGRES_USER: str | None = None
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     ENABLE_DATABASE_SSL: bool = True
 
     # Redis credentials
-    REDIS_URL: RedisDsn | None
+    REDIS_URL: RedisDsn | None = None
     # if the `REDIS_URL` is not set, then use the following credentials:
     REDIS_HOST: str | None = None
     REDIS_PORT: int | None = 6379
