@@ -46,12 +46,12 @@ class CommandTrigger(BaseFlowTrigger):
     async def _check(self, connector: FlowConnector, scope: FlowScopes | None = None) -> bool:
         """Check if the `Flow` can be run based on the command (and the scope, if provided)."""
         matches: list[str] = [
-            f"{connector.bot.command_prefix}{self.command}",
+            f"{settings.BOT_COMMAND_PREFIX}{self.command}",
         ]
 
         if settings.DO_USE_COMMAND_ALIASES or settings.DEBUG:
             command_alias = "".join([part[0] for part in self.command.split("_") if part])
-            matches.append(f"{connector.bot.command_prefix}{command_alias}")
+            matches.append(f"{settings.BOT_COMMAND_PREFIX}{command_alias}")
 
         if connector.message and connector.message.content in matches:
             return True

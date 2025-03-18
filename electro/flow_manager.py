@@ -7,7 +7,6 @@ from collections import defaultdict
 
 from . import types_ as types
 from ._common import ContextInstanceMixin
-from .bot import bot as global_bot
 from .enums import ChannelType
 from .exceptions import EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
@@ -167,12 +166,10 @@ class FlowManager(ContextInstanceMixin):
 
     def __init__(
         self,
-        bot: types.Bot,
         flows: typing.Optional[list[Flow]] = None,
         storage: typing.Optional[BaseFlowStorage] = None,
         on_finish_callbacks: typing.Optional[list[typing.Callable[[FlowConnector], typing.Awaitable[None]]]] = None,
     ):
-        self.bot = bot
         self.flows: list[Flow] = flows or []
 
         self.storage = storage or FlowMemoryStorage()
@@ -346,7 +343,7 @@ class FlowManager(ContextInstanceMixin):
             if (
                 flow_connector.event == FlowConnectorEvents.MESSAGE
                 and flow_connector.message.content
-                and flow_connector.message.content.startswith(flow_connector.bot.command_prefix)
+                and flow_connector.message.content.startswith(settings.BOT_COMMAND_PREFIX)
             ):
                 if scope == FlowScopes.USER:
                     # Remove user's state, so that the user wouldn't resume any flow
@@ -442,7 +439,6 @@ class FlowManager(ContextInstanceMixin):
 
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.MESSAGE,
             user=message.author,
             channel=message.channel,
@@ -476,7 +472,6 @@ class FlowManager(ContextInstanceMixin):
         # noinspection PyTypeChecker
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.BUTTON_CLICK,
             user=interaction.user,
             channel=interaction.channel,
@@ -506,7 +501,6 @@ class FlowManager(ContextInstanceMixin):
         # noinspection PyProtectedMember
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.MEMBER_JOIN,
             user=member._user,
             member=member,
@@ -534,7 +528,6 @@ class FlowManager(ContextInstanceMixin):
         # noinspection PyProtectedMember
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.MEMBER_UPDATE,
             user=after._user,
             member=after,
@@ -571,6 +564,4 @@ class FlowManager(ContextInstanceMixin):
     # endregion
 
 
-global_flow_manager = FlowManager(
-    bot=global_bot,
-)
+global_flow_manager = FlowManager()

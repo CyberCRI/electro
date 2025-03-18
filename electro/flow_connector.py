@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 import discord
-from discord.ext import commands
 
 from ._common import ContextInstanceMixin
 from .interfaces import BaseInterface
@@ -38,8 +37,6 @@ class FlowConnector(ContextInstanceMixin):
     # TODO: [05.09.2023 by Mykola] Forbid re-assigning the attributes of this class
 
     flow_manager: FlowManager
-
-    bot: commands.Bot
 
     event: FlowConnectorEvents
 

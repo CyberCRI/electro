@@ -61,7 +61,7 @@ class ManualRedisStorageSubstitution(BaseSubstitution):
 
     async def _resolve(self, connector: FlowConnector) -> str:
         if not self.is_chat_specific and not isinstance(connector.channel, discord.DMChannel):
-            channel = await connector.bot.create_dm(connector.user)
+            channel = await connector.user.create_dm()
         else:
             channel = connector.channel
 
