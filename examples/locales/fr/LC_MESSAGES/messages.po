@@ -5,13 +5,12 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: POEditor.com\n"
 "Project-Id-Version: electro\n"
-"Language: en\n"
+"Language: fr\n"
 
 #: test_flow.py:21
 msgid "test_flow_message"
-msgstr "Testing this `electro` Flow step 1. Everything works!"
+msgstr "Test du Flow `electro` étape 1. Tout fonctionne!"
 
 #: test_flow.py:22
 msgid "test_flow_message_2"
-msgstr "Testing this `electro` Flow step 2. Everything works!"
-
+msgstr "Test du Flow `electro` étape 2. Tout fonctionne!"

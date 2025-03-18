@@ -14,6 +14,7 @@ from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
 
 # from decorators import fail_safely
+from .interfaces import BaseInterface
 from .models import Channel, Interaction, Message, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
@@ -273,6 +274,7 @@ class FlowManager(ContextInstanceMixin):
         # Run the callbacks
         for callback in self._on_finish_callbacks:
             await callback(flow_connector)
+        return await flow_connector.interface.stop_process(reason="end_of_flow")
 
     async def _create_user_and_channel(
         self, user: types.User | None = None, channel: types.Channel | types.DMChannel | None = None
@@ -337,9 +339,8 @@ class FlowManager(ContextInstanceMixin):
         for flow in self.flows:
             # Check all the triggers
             if await flow.check_triggers(flow_connector, scope=scope):
-                return await flow.run(flow_connector)
-                # break
-
+                await flow.run(flow_connector)
+                break
         else:
             # Check if it's not something that shouldn't be handled by the flows
             if (
@@ -419,7 +420,7 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, message: types.Message) -> list[Message] | None:
+    async def on_message(self, message: types.Message, interface: BaseInterface) -> list[Message] | None:
         """Handle the messages sent by the users."""
 
         # Save the message to the database
@@ -451,6 +452,7 @@ class FlowManager(ContextInstanceMixin):
             user_data=user_data,
             channel_state=channel_state,
             channel_data=channel_data,
+            interface=interface,
         )
 
         return await self.dispatch(flow_connector)

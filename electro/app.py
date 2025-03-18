@@ -1,10 +1,12 @@
 """The API server that works as an endpoint for all the Electro Interfaces."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
 from .flow_manager import global_flow_manager
+from .interfaces import APIInterface, WebSocketInterface
 from .toolkit.tortoise_orm import get_tortoise_config
 
 app = FastAPI(
@@ -17,16 +19,26 @@ app = FastAPI(
 
 
 @app.post("/message")
-async def process_message(message: types.Message) -> list[types.MessageToSend] | None:
+async def process_message(message: types.Message) -> types.MessageToSend | None:
     """Process the message."""
+    interface = APIInterface()
+    return await global_flow_manager.on_message(message, interface)
 
-    return await global_flow_manager.on_message(message)
+
+@app.websocket("/websocket/client/{client_name}/user/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: str):
+    interface = WebSocketInterface()
+    await interface.connect(websocket)
+    try:
+        while websocket.application_state == WebSocketState.CONNECTED:
+            data = await websocket.receive_json()
+            data = types.Message.model_validate(data)
+            await global_flow_manager.on_message(data, interface)
+    except WebSocketDisconnect:
+        await interface.disconnect()
 
 
 # region Register Tortoise
-register_tortoise(
-    app,
-    config=get_tortoise_config(),
-)
+register_tortoise(app, config=get_tortoise_config())
 
 # endregion
