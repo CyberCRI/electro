@@ -1,18 +1,55 @@
 """The buttons that can be used in the `electro` Framework."""
 
 import typing
+from enum import Enum
 
-import discord.ui
-
+from .. import types_ as types
 from ..flow import Flow
 from ..flow_connector import FlowConnector
 from ..flow_step import BaseFlowStep
-from ..toolkit.buttons import FrameworkButtonStyle
 
 CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseFlowStep
 
 
-class ActionButton(discord.ui.Button):
+class ButtonStyle(Enum):
+    """A class to store the button styles."""
+
+    primary = 1
+    secondary = 2
+    success = 3
+    danger = 4
+
+    def __int__(self):
+        return self.value
+
+
+class Button:
+    """The base class for buttons."""
+
+    def __init__(
+        self,
+        label: str | None = None,
+        style: ButtonStyle = ButtonStyle.primary,
+        custom_id: str | None = None,
+        disabled: bool = False,
+    ):
+        super().__init__()
+        if label and len(str(label)) > 80:
+            raise ValueError("label must be 80 characters or fewer")
+        if custom_id is not None and len(str(custom_id)) > 100:
+            raise ValueError("custom_id must be 100 characters or fewer")
+        if not isinstance(custom_id, str) and custom_id is not None:
+            raise TypeError(
+                f"expected custom_id to be str, not {custom_id.__class__.__name__}"
+            )
+
+        self.style = style
+        self.label = label
+        self.custom_id = custom_id
+        self.disabled = disabled
+
+
+class ActionButton(Button):
     """A button that performs an action when clicked."""
 
     action_callback: CALLBACK_TYPE
@@ -59,10 +96,10 @@ class GoToFlowButton(ActionButton):
             return await flow.run(flow_connector)
 
 
-class DataButton(discord.ui.Button):
-    def __init__(self, label: str, style: FrameworkButtonStyle, custom_id: str = None, **kwargs):
+class DataButton(Button):
+    def __init__(self, label: str, style: ButtonStyle, custom_id: str = None, **kwargs):
         super().__init__(label=label, style=style, custom_id=custom_id)
         self.kwargs = kwargs
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callback(self, interaction: types.Interaction):
         interaction.data = {**interaction.data, **self.kwargs}

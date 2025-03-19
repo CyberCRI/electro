@@ -6,13 +6,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
-import discord
-
+from . import types_ as types
 from ._common import ContextInstanceMixin
 from .interfaces import BaseInterface
 from .models import Interaction, Message
 from .storage import ChannelData, UserData
-from .types_ import Channel, User
+
 
 if TYPE_CHECKING:
     from electro import FlowManager
@@ -22,11 +21,8 @@ class FlowConnectorEvents(str, Enum):
     """The events that are used in the `FlowConnector`."""
 
     MESSAGE = "message"
-
     BUTTON_CLICK = "button_click"
-
     MEMBER_JOIN = "member_join"
-
     MEMBER_UPDATE = "member_update"
 
 
@@ -40,8 +36,8 @@ class FlowConnector(ContextInstanceMixin):
 
     event: FlowConnectorEvents
 
-    user: User | None
-    channel: Channel | None
+    user: types.User | None
+    channel: types.Channel | None
 
     user_state: str | None
     user_data: UserData
@@ -49,13 +45,13 @@ class FlowConnector(ContextInstanceMixin):
     channel_state: str | None
     channel_data: ChannelData
 
-    message: discord.Message | None = None
-    interaction: discord.Interaction | None = None
+    message: types.Message | None = None
+    interaction: types.Interaction | None = None
 
     message_obj: Message | None = None
     interaction_obj: Interaction | None = None
 
-    member: discord.Member | None = None
+    member: types.Member | None = None
     substitutions: dict[str, str] | None = None
 
     extra_data: dict[str, Any] | None = None

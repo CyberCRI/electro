@@ -14,7 +14,7 @@ from discord.ui.view import _ViewWeights
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from ..substitutions import BaseSubstitution
-from ..toolkit.buttons import create_button, FrameworkButtonStyle
+from ..contrib.buttons import Button, ButtonStyle
 from ..toolkit.loguru_logging import logger
 
 if typing.TYPE_CHECKING:
@@ -41,10 +41,10 @@ class BaseView(discord.ui.View, ABC):
     # NB: The use of `emoji_buttons` is discouraged unless the button's label is a one-time text
     # (not being saved in the storage)
     emoji_buttons: bool = False
-    buttons_style: FrameworkButtonStyle = FrameworkButtonStyle.primary
+    buttons_style: ButtonStyle = ButtonStyle.primary
 
     _parent_view: BaseView | None = None
-    _custom_id_to_button: dict[str, discord.ui.Button] = {}
+    _custom_id_to_button: dict[str, Button] = {}
 
     _user_connectors_to_views: dict[int, BaseView]
 
@@ -53,7 +53,7 @@ class BaseView(discord.ui.View, ABC):
     def __init__(
         self,
         emoji_buttons: bool | None = None,
-        buttons_style: FrameworkButtonStyle = FrameworkButtonStyle.primary,
+        buttons_style: ButtonStyle = ButtonStyle.primary,
         force_init_on_step_run: bool = False,
         clear_storage_on_step_run: bool = False,
         timeout: int | None = None,
@@ -76,7 +76,7 @@ class BaseView(discord.ui.View, ABC):
     async def get_or_create_for_connector(
         self,
         flow_connector: FlowConnector,
-        dynamic_buttons: list[str | discord.Button] | None = None,
+        dynamic_buttons: list[str | Button] | None = None,
         force_init: bool = False,
         force_get: bool = False,
         from_step_run: bool = False,
@@ -106,7 +106,7 @@ class BaseView(discord.ui.View, ABC):
         # Same with `self.__weights = _ViewWeights(self.children)`
         view._View__weights = _ViewWeights(view.children)
 
-        static_buttons: list[discord.ui.Button | str] = [
+        static_buttons: list[Button | str] = [
             (
                 button_or_string[: self._trim_button_labels_at]
                 if self._trim_button_labels_at and isinstance(button_or_string, str)
@@ -123,7 +123,7 @@ class BaseView(discord.ui.View, ABC):
         # interaction
         # TODO: [07.09.2023 by Mykola] Find a more sustainable way to do this
         for item in view.children:
-            if isinstance(item, discord.ui.Button):
+            if isinstance(item, Button):
                 self._custom_id_to_button[item.custom_id] = item
 
         view._parent_view = self
@@ -139,34 +139,37 @@ class BaseView(discord.ui.View, ABC):
 
     @staticmethod
     def strings_to_buttons(
-        strings: list[str], buttons_style: FrameworkButtonStyle = FrameworkButtonStyle.primary
-    ) -> list[discord.ui.Button]:
+        strings: list[str], buttons_style: ButtonStyle = ButtonStyle.primary
+    ) -> list[Button]:
         """Convert the strings to buttons."""
-        return [create_button(string, style=buttons_style or FrameworkButtonStyle.primary) for string in strings]
+        return [
+            Button(string, style=buttons_style or ButtonStyle.primary)
+            for string in strings
+        ]
 
     # TODO: [07.09.2023 by Mykola] Make it not `async`
     @abstractmethod
-    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[discord.ui.Button | str]:
+    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[Button | str]:
         """Get the static buttons for the view."""
         raise NotImplementedError
 
-    def _add_buttons(self, *buttons: discord.ui.Button | str):
+    def _add_buttons(self, *buttons: Button | str):
         """Add buttons to the view."""
         for button in buttons:
             if isinstance(button, str):
-                button = create_button(button, style=self.buttons_style or FrameworkButtonStyle.primary)
+                button = Button(button, style=self.buttons_style or ButtonStyle.primary)
 
             self.add_item(button)
 
-    def _remove_button(self, button: discord.ui.Button):
+    def _remove_button(self, button: Button):
         """Remove the button from the view."""
         self.children.remove(button)
 
-    def _get_button_by_custom_id(self, custom_id: str) -> discord.ui.Button | None:
+    def _get_button_by_custom_id(self, custom_id: str) -> Button | None:
         """Get the button by its custom id."""
         logger.debug("Getting the button by its custom id from the view.")
         for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.custom_id == custom_id:
+            if isinstance(item, Button) and item.custom_id == custom_id:
                 return item
         else:
             logger.debug(f"Cannot find the button with custom id {custom_id} in {self.children=}")
@@ -208,7 +211,7 @@ class BaseView(discord.ui.View, ABC):
             raise exception
 
     @abstractmethod
-    async def process_button_click(self, button: discord.ui.Button, flow_connector: FlowConnector):
+    async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
         raise NotImplementedError
 
@@ -230,7 +233,7 @@ class ConfirmButtonView(BaseView):
 
     confirm_button_label: str
 
-    _confirm_button: discord.ui.Button | None = None
+    _confirm_button: Button | None = None
 
     def __init__(self, confirm_button_label: str, **kwargs):
         """Initialize the view."""
@@ -239,19 +242,19 @@ class ConfirmButtonView(BaseView):
         self.confirm_button_label = confirm_button_label
 
     @property
-    def confirm_button(self) -> discord.ui.Button:
+    def confirm_button(self) -> Button:
         if not self._confirm_button:
-            self._confirm_button = create_button(
-                self.confirm_button_label, style=self.buttons_style or FrameworkButtonStyle.secondary
+            self._confirm_button = Button(
+                self.confirm_button_label, style=self.buttons_style or ButtonStyle.secondary
             )
 
         return self._confirm_button
 
     @confirm_button.setter
-    def confirm_button(self, value: discord.ui.Button):
+    def confirm_button(self, value: Button):
         self._confirm_button = value
 
-    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[discord.ui.Button | str]:
+    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[Button | str]:
         return [self.confirm_button]
 
     async def on_submit(self, flow_connector: FlowConnector):
@@ -260,7 +263,7 @@ class ConfirmButtonView(BaseView):
 
         raise ViewStepFinished()
 
-    async def process_button_click(self, button: discord.ui.Button, flow_connector: FlowConnector):
+    async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
         return await self.on_submit(flow_connector)
 
@@ -293,7 +296,7 @@ class ChooseOneOptionView(BaseView, StorageMixin):
 
     def __init__(
         self,
-        options: list[str | discord.ui.Button] | typing.Callable[[], typing.Awaitable[list[str]]],
+        options: list[str | Button] | typing.Callable[[], typing.Awaitable[list[str]]],
         answers_storage: StorageBucketElement | None = None,
         **kwargs,
     ):
@@ -312,7 +315,7 @@ class ChooseOneOptionView(BaseView, StorageMixin):
         """Get the buttons for the view."""
         return self.options if isinstance(self.options, list) else await self.options()
 
-    async def process_button_click(self, button: discord.ui.Button, flow_connector: FlowConnector):
+    async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
         await self._remove_view(flow_connector.interaction)
 
@@ -332,7 +335,7 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
 
     confirm_button_label: str | None = None
 
-    _confirm_button: discord.ui.Button | None = None
+    _confirm_button: Button | None = None
 
     def __init__(
         self,
@@ -346,8 +349,8 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
         n_answers_to_select: int | None = None,
         min_answers_allowed: int | None = None,
         answers_storage: StorageBucketElement | None = None,
-        answers_selection_style: FrameworkButtonStyle = FrameworkButtonStyle.success,
-        confirm_button_style: FrameworkButtonStyle = FrameworkButtonStyle.primary,
+        answers_selection_style: ButtonStyle = ButtonStyle.success,
+        confirm_button_style: ButtonStyle = ButtonStyle.primary,
         **kwargs,
     ):
         """Initialize the view."""
@@ -362,7 +365,7 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
         self.answers_selection_style = answers_selection_style
         self.confirm_button_style = confirm_button_style
 
-    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[discord.ui.Button | str]:
+    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[Button | str]:
         """Get the buttons for the answers, and the confirm button."""
         confirm_button = copy(self.confirm_button)
 
@@ -387,7 +390,7 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
             confirm_button,
         ]
 
-    def _update_user_answers(self, user_answers: list[str], button: discord.ui.Button) -> None:
+    def _update_user_answers(self, user_answers: list[str], button: Button) -> None:
         """Update the user answers."""
         if button.label in user_answers:
             user_answers.remove(button.label)
@@ -404,7 +407,7 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
             #  copied for all the individual views
             # if item == self._confirm_button:
             #     continue
-            if isinstance(item, discord.ui.Button) and item.label not in user_answers:
+            if isinstance(item, Button) and item.label not in user_answers:
                 item.disabled = True
 
     def _enable_all_buttons(self) -> None:
@@ -413,19 +416,19 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
             # Skip the confirm button
             if item == self._confirm_button:
                 continue
-            if isinstance(item, discord.ui.Button):
+            if isinstance(item, Button):
                 item.disabled = False
 
     def _change_confirm_button_state(self, enabled: bool = True) -> None:
         """Change the confirm button state."""
         for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.label == self.confirm_button_label:
+            if isinstance(item, Button) and item.label == self.confirm_button_label:
                 item.disabled = not enabled
 
     async def get_or_create_for_connector(
         self,
         flow_connector: FlowConnector,
-        dynamic_buttons: list[str | discord.Button] | None = None,
+        dynamic_buttons: list[str | Button] | None = None,
         force_init: bool = False,
         force_get: bool = False,
         from_step_run: bool = False,
@@ -438,7 +441,7 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
             flow_connector, dynamic_buttons, force_init, force_get, from_step_run
         )
 
-    async def process_button_click(self, button: discord.ui.Button, flow_connector: FlowConnector):
+    async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Save the answer and check whether the `n_answers_to_select` is reached."""
 
         if button.label == self.confirm_button.label:
@@ -501,7 +504,7 @@ class ActionButtonsView(ConfirmButtonView):
             **kwargs,
         )
 
-    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[discord.ui.Button]:
+    async def get_static_buttons(self, flow_connector: FlowConnector) -> list[Button]:
         """Get the buttons for the view."""
         return self.action_buttons + (
             await super().get_static_buttons(flow_connector)
@@ -509,7 +512,7 @@ class ActionButtonsView(ConfirmButtonView):
             else []
         )
 
-    async def process_button_click(self, button: discord.ui.Button, flow_connector: FlowConnector):
+    async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
         from .buttons import ActionButton
 

@@ -67,6 +67,26 @@ class Message(ElectroBaseModel):
     edited_at: datetime | None
 
 
+class Interaction(ElectroBaseModel):
+    """The model for Interaction."""
+
+    id: int
+
+    user: User
+    channel: Channel
+    message: Message
+
+    custom_id: str
+
+
+class Member(ElectroBaseModel):
+    """The model for Member."""
+
+    id: int
+    _user: User
+    guild: Guild
+
+
 class MessageToSend(ElectroBaseModel):
     """The model for Message to send."""
 
