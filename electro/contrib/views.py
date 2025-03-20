@@ -7,10 +7,6 @@ import typing
 from abc import ABC, abstractmethod
 from copy import copy
 
-import discord
-
-# noinspection PyProtectedMember
-from discord.ui.view import _ViewWeights
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from ..substitutions import BaseSubstitution
@@ -35,13 +31,14 @@ class ViewStepFinished(Exception):
     pass
 
 
-class BaseView(discord.ui.View, ABC):
+class BaseView(ABC):
     """The base view for all the views in the framework."""
 
     # NB: The use of `emoji_buttons` is discouraged unless the button's label is a one-time text
     # (not being saved in the storage)
     emoji_buttons: bool = False
     buttons_style: ButtonStyle = ButtonStyle.primary
+    children: list[Button | str] = []
 
     _parent_view: BaseView | None = None
     _custom_id_to_button: dict[str, Button] = {}
@@ -103,8 +100,6 @@ class BaseView(discord.ui.View, ABC):
         # link to the original view's children. We need to set it to an empty list to avoid
         # modifying the original view's children
         view.children = []
-        # Same with `self.__weights = _ViewWeights(self.children)`
-        view._View__weights = _ViewWeights(view.children)
 
         static_buttons: list[Button | str] = [
             (
@@ -177,39 +172,6 @@ class BaseView(discord.ui.View, ABC):
         logger.debug(f"Trying to get the button from the parent view.")
         return (self._parent_view or self)._custom_id_to_button.get(custom_id)
 
-    @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True)
-    async def _defer(interaction: discord.Interaction):
-        try:
-            await interaction.response.defer()
-        except discord.InteractionResponded:
-            pass
-        except discord.NotFound:
-            logger.warning(f"Interaction {interaction.id} was not found. Cannot defer the response.")
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_fixed(3),
-        reraise=False,
-        retry_error_callback=lambda _: None,
-    )
-    async def _update_view(self, interaction: discord.Interaction):
-        """Update the view."""
-        try:
-            await interaction.response.edit_message(view=self)
-        except discord.NotFound as exception:
-            logger.warning(f"Interaction {interaction.id} was not found. Cannot update the view.")
-            raise exception
-
-    @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=False)
-    async def _remove_view(interaction: discord.Interaction):
-        try:
-            await interaction.response.edit_message(view=None)
-        except discord.NotFound as exception:
-            logger.warning(f"Interaction {interaction.id} was not found. Cannot remove the view.")
-            raise exception
-
     @abstractmethod
     async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
@@ -259,8 +221,6 @@ class ConfirmButtonView(BaseView):
 
     async def on_submit(self, flow_connector: FlowConnector):
         """The method that is called when the confirm button is clicked."""
-        await self._remove_view(flow_connector.interaction)
-
         raise ViewStepFinished()
 
     async def process_button_click(self, button: Button, flow_connector: FlowConnector):
@@ -317,10 +277,7 @@ class ChooseOneOptionView(BaseView, StorageMixin):
 
     async def process_button_click(self, button: Button, flow_connector: FlowConnector):
         """Process the button click."""
-        await self._remove_view(flow_connector.interaction)
-
         await self._set_user_answer(button.label)
-
         raise ViewStepFinished()
 
 
@@ -453,23 +410,17 @@ class MultipleAnswersView(ConfirmButtonView, StorageMixin):
         self._update_user_answers(user_answers, button)
         await self._set_user_answer(user_answers)
 
-        if self._confirm_button:
-            if self.n_answers_to_select:
-                if len(user_answers) >= self.n_answers_to_select:
-                    self._disable_unselected_buttons(user_answers)
-                else:
-                    self._enable_all_buttons()
+        if self.n_answers_to_select:
+            if len(user_answers) >= self.n_answers_to_select:
+                self._disable_unselected_buttons(user_answers)
+            else:
+                self._enable_all_buttons()
 
-            if self.min_answers_allowed:
-                if len(user_answers) >= self.min_answers_allowed:
-                    self._change_confirm_button_state(enabled=True)
-                else:
-                    self._change_confirm_button_state(enabled=False)
-
-            return await self._update_view(flow_connector.interaction)
-
-        else:
-            return await self._defer(flow_connector.interaction)
+        if self.min_answers_allowed:
+            if len(user_answers) >= self.min_answers_allowed:
+                self._change_confirm_button_state(enabled=True)
+            else:
+                self._change_confirm_button_state(enabled=False)
 
 
 # region ActionButtonsView
@@ -523,10 +474,7 @@ class ActionButtonsView(ConfirmButtonView):
         raise_view_step_finished: bool = False
 
         try:
-            if self.one_time_view:
-                await self.on_submit(flow_connector)
-            else:
-                await self._defer(flow_connector.interaction)
+            await self.on_submit(flow_connector)
         except ViewStepFinished:
             raise_view_step_finished = True
             pass

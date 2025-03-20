@@ -200,7 +200,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     message: TemplatedString | None = None
     response_message: TemplatedString | None = None
 
-    channel_to_send_to: discord.abc.Messageable | BaseSubstitution | GlobalAbstractChannel | None = None
+    channel_to_send_to: Channel | BaseSubstitution | GlobalAbstractChannel | None = None
 
     substitutions: dict[str, str] | None = None
 
@@ -235,7 +235,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         self,
         connector: FlowConnector,
         message: TemplatedString | str,
-        channel: discord.abc.Messageable | BaseSubstitution[discord.abc.Messageable] | None = None,
+        channel: Channel | BaseSubstitution[Channel] | None = None,
         view: BaseView | None = None,
     ) -> MessageToSend:
         """Send the message."""
@@ -278,7 +278,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         # TODO: [2025-03-03 by Mykola] Allow sending multiple messages
         return message
 
-    async def respond(self, connector: FlowConnector) -> discord.Message:
+    async def respond(self, connector: FlowConnector) -> MessageToSend:
         """Respond to the user."""
         if self.response_message:
             return await self.send_message(connector, self.response_message, channel=connector.channel)
@@ -316,8 +316,8 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
 class DirectMessageFlowStep(MessageFlowStep):
     """The same as `MessageFlowStep`, but sends the message to the user's DMs."""
 
-    async def run(self, connector: FlowConnector, channel_to_send_to: discord.abc.Messageable | None = None):
-        if not channel_to_send_to and not isinstance(connector.channel, discord.DMChannel):
+    async def run(self, connector: FlowConnector, channel_to_send_to: Channel | None = None):
+        if not channel_to_send_to:
             channel_to_send_to = GlobalAbstractChannel.DM_CHANNEL
 
         return await super().run(connector, channel_to_send_to=channel_to_send_to)
