@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Type
 
-import discord
-
 from .. import FlowConnector
+from ..contrib.buttons import Button
 from ..contrib.storage_buckets import BaseStorageBucketElement
 from ..flow_step import MessageFlowStep
 from ..models import BaseModel, File
@@ -25,7 +24,7 @@ class ChooseOneModelView(ChooseOneOptionView):
     def __init__(
         self,
         model_to_choose_from: Type[BaseModel],
-        options: list[str | discord.ui.Button] | typing.Callable[[], typing.Awaitable[list[str]]] = None,
+        options: list[str | Button] | typing.Callable[[], typing.Awaitable[list[str]]] = None,
         answers_storage: BaseStorageBucketElement | None = None,
         **kwargs,
     ):
@@ -48,7 +47,7 @@ class ChooseOneModelView(ChooseOneOptionView):
     async def get_or_create_for_connector(
         self,
         flow_connector: FlowConnector,
-        dynamic_buttons: list[str | discord.Button] | None = None,
+        dynamic_buttons: list[str | Button] | None = None,
         force_init: bool = False,
         force_get: bool = False,
         from_step_run: bool = False,

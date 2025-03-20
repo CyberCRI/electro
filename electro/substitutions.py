@@ -6,8 +6,7 @@ import typing
 from abc import ABC, abstractmethod
 from enum import Enum
 
-import discord
-
+from . import types_ as types
 from .flow_connector import FlowConnector
 from .toolkit.redis_storage import RedisStorage
 
@@ -60,8 +59,8 @@ class ManualRedisStorageSubstitution(BaseSubstitution):
         self.is_chat_specific = is_chat_specific
 
     async def _resolve(self, connector: FlowConnector) -> str:
-        if not self.is_chat_specific and not isinstance(connector.channel, discord.DMChannel):
-            channel = await connector.bot.create_dm(connector.user)
+        if not self.is_chat_specific and not isinstance(connector.channel, types.Channel):
+            channel = await connector.user.create_dm()
         else:
             channel = connector.channel
 
@@ -133,7 +132,7 @@ class BaseFlowSubstitutionObject(ABC):
 
 
 class UserSubstitutionObject(BaseFlowSubstitutionObject):
-    object: discord.User
+    object: types.User
 
     flow_connector_attribute = "user"
 
@@ -149,8 +148,8 @@ class GlobalAbstractChannel(str, Enum):
 
 
 async def resolve_channel(
-    abstract_channel: GlobalAbstractChannel, user: discord.User
-) -> discord.TextChannel | discord.DMChannel:
+    abstract_channel: GlobalAbstractChannel, user: types.User
+) -> types.Channel:
     """Resolve the channel by the name."""
     if abstract_channel == GlobalAbstractChannel.DM_CHANNEL:
         return await user.create_dm()
