@@ -45,11 +45,14 @@ class Model(tortoise_Model, metaclass=ModelMeta):
 
 def get_tortoise_config():
     """Get the configuration for the `tortoise-orm`."""
-    if not (database_url := str(settings.DATABASE_URL)):
+    if not settings.DATABASE_URL:
         database_url = (
             f"postgres://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@"
             f"{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
+    else:
+        database_url = str(settings.DATABASE_URL)
+
     db = expand_db_url(database_url)
     ctx = False
     if settings.ENABLE_DATABASE_SSL:
