@@ -14,7 +14,7 @@ from .flow_connector import FlowConnectorEvents
 
 # from decorators import fail_safely
 from .interfaces import BaseInterface
-from .models import Channel, Interaction, Message, User, UserStateChanged
+from .models import Channel, Button, Message, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
@@ -118,28 +118,20 @@ class AnalyticsManager(ContextInstanceMixin):
             is_command=message.content.startswith(settings.BOT_COMMAND_PREFIX),
         )
 
-    async def save_interaction(
-        self, interaction: types.Interaction, return_message_obj=False
-    ) -> Interaction | tuple[Interaction, Message]:
-        """Save the interaction to the database."""
+    async def save_button_click(self, button: types.Button) -> Button:
+        """Save the button to the database."""
         # Get the user and channel objects (make sure they exist in the database)
-        user_obj = await self._get_user_obj(interaction.user, interaction.guild)
-        channel_obj = await self._get_channel_obj(interaction.channel)
 
-        message_obj = await self.get_or_save_message(interaction.message)
-
-        interaction_obj: Interaction = await Interaction.create(
-            id=interaction.id,
-            user=user_obj,
-            channel=channel_obj,
-            message=message_obj,
-            custom_id=interaction.data.get("custom_id"),
+        button_obj, _ = await Button.get_or_create(
+            id=button.id,
+            defaults={
+                "user": await self._get_user_obj(button.user),
+                "channel": await self._get_channel_obj(button.channel),
+                "custom_id": button.custom_id,
+                "clicked": True
+            },
         )
-
-        if return_message_obj:
-            return interaction_obj, message_obj
-
-        return interaction_obj
+        return button_obj
 
     async def save_user_state_changed(
         self, user: types.User, previous_state: str | None, new_state: str | None
@@ -453,34 +445,31 @@ class FlowManager(ContextInstanceMixin):
 
         return await self.dispatch(flow_connector)
 
-    async def on_interaction(self, interaction: types.Interaction):
-        """Handle the interactions sent by the users."""
-        # Save the interaction to the database
-        interaction_obj, message_obj = await self.analytics_manager.save_interaction(
-            interaction, return_message_obj=True
-        )
+    async def on_button_click(self, button: types.Button):
+        """Handle the buttons clicked by the users."""
+        # Save the button click to the database
+        button_obj = await self.analytics_manager.save_button_click(button)
 
         # Get the user state and data
-        logger.info(f"Getting the user state and data for {interaction.user.id}")
-        user_state = await self._get_user_state(interaction.user)
-        user_data = await self._get_user_data(interaction.user)
+        logger.info(f"Getting the user state and data for {button.user.id}")
+        user_state = await self._get_user_state(button.user)
+        user_data = await self._get_user_data(button.user)
 
         # Get the channel state and data
-        channel_state = await self._get_channel_state(interaction.message.channel)
-        channel_data = await self._get_channel_data(interaction.message.channel)
+        channel_state = await self._get_channel_state(button.message.channel)
+        channel_data = await self._get_channel_data(button.message.channel)
 
         # noinspection PyTypeChecker
         flow_connector = FlowConnector(
             flow_manager=self,
             event=FlowConnectorEvents.BUTTON_CLICK,
-            user=interaction.user,
-            channel=interaction.channel,
+            user=button.user,
+            channel=button.channel,
             user_state=user_state,
             user_data=user_data,
-            message=interaction.message,
-            interaction=interaction,
-            message_obj=message_obj,
-            interaction_obj=interaction_obj,
+            button=button,
+            message_obj=None,
+            button_obj=button_obj,
             channel_state=channel_state,
             channel_data=channel_data,
         )

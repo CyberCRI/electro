@@ -67,16 +67,14 @@ class Message(ElectroBaseModel):
     edited_at: datetime | None
 
 
-class Interaction(ElectroBaseModel):
-    """The model for Interaction."""
+class Button(ElectroBaseModel):
+    """The model for Button."""
 
     id: int
-
     user: User
     channel: Channel
-    message: Message
-
     custom_id: str
+    clicked_at: bool = False
 
 
 class Member(ElectroBaseModel):

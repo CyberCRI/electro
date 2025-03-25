@@ -287,13 +287,9 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     async def process_response(self, connector: FlowConnector):
         """Process the response. If the `.response_message` is set, send it."""
         if self.buttons and connector.event == FlowConnectorEvents.BUTTON_CLICK:
-            custom_id = connector.interaction.data.get("custom_id")
-            if not custom_id:
-                logger.error(f"Cannot find the custom id in {connector.interaction.data=}")
-                return
-            button = self.buttons.get(custom_id)
+            button = self.buttons.get(connector.button.custom_id)
             if not button:
-                logger.error(f"Cannot find the button with custom id {custom_id} in {self.buttons=}")
+                logger.error(f"Cannot find the button with custom id {connector.button.custom_id} in {self.buttons=}")
                 return
             return await button.trigger_action(connector)
 

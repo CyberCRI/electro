@@ -183,19 +183,19 @@ class Message(BaseModel):
         return f"`{self.author}` Message: `{self.content}`."
 
 
-class Interaction(BaseModel):
-    """The model for Interaction."""
+class Button(BaseModel):
+    """The model for Button."""
 
     id = fields.BigIntField(pk=True)
 
-    user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="interactions")
-    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="interactions")
-
+    user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="buttons")
+    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="buttons")
     custom_id = fields.CharField(max_length=255)
+    clicked = fields.BooleanField(default=False)
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"`{self.user}` Interaction `{self.custom_id}`."
+        return f"`{self.user}` Button `{self.custom_id}`."
 
 
 class UserStateChanged(BaseModel):

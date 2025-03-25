@@ -9,7 +9,7 @@ from typing import Any, TYPE_CHECKING
 from . import types_ as types
 from ._common import ContextInstanceMixin
 from .interfaces import BaseInterface
-from .models import Interaction, Message
+from .models import Button, Message
 from .storage import ChannelData, UserData
 
 if TYPE_CHECKING:
@@ -45,10 +45,10 @@ class FlowConnector(ContextInstanceMixin):
     channel_data: ChannelData
 
     message: types.Message | None = None
-    interaction: types.Interaction | None = None
+    button: types.Button | None = None
 
     message_obj: Message | None = None
-    interaction_obj: Interaction | None = None
+    button_obj: Button | None = None
 
     member: types.Member | None = None
     substitutions: dict[str, str] | None = None

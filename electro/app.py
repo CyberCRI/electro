@@ -39,8 +39,8 @@ async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: st
                 content = types.Message.model_validate(content)
                 await global_flow_manager.on_message(content, interface)
             if action == FlowConnectorEvents.BUTTON_CLICK:
-                content = types.Interaction.model_validate(content)
-                await global_flow_manager.on_interaction(content, interface)
+                content = types.Button.model_validate(content)
+                await global_flow_manager.on_button_click(content, interface)
             if action == FlowConnectorEvents.MEMBER_JOIN:
                 content = types.Member.model_validate(content)
                 await global_flow_manager.on_member_join(data, interface)
