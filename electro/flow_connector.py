@@ -12,7 +12,6 @@ from .interfaces import BaseInterface
 from .models import Interaction, Message
 from .storage import ChannelData, UserData
 
-
 if TYPE_CHECKING:
     from electro import FlowManager
 

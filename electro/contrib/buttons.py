@@ -4,7 +4,6 @@ import typing
 from enum import Enum
 
 from .. import types_ as types
-from ..flow import Flow
 from ..flow_connector import FlowConnector
 from ..flow_step import BaseFlowStep
 
@@ -18,6 +17,13 @@ class ButtonStyle(Enum):
     secondary = 2
     success = 3
     danger = 4
+
+    blurple = 1
+    grey = 2
+    gray = 2
+    green = 3
+    red = 4
+    url = 5
 
     def __int__(self):
         return self.value
@@ -39,14 +45,21 @@ class Button:
         if custom_id is not None and len(str(custom_id)) > 100:
             raise ValueError("custom_id must be 100 characters or fewer")
         if not isinstance(custom_id, str) and custom_id is not None:
-            raise TypeError(
-                f"expected custom_id to be str, not {custom_id.__class__.__name__}"
-            )
+            raise TypeError(f"expected custom_id to be str, not {custom_id.__class__.__name__}")
 
         self.style = style
         self.label = label
         self.custom_id = custom_id
         self.disabled = disabled
+
+    def to_dict(self) -> dict[str, typing.Any]:
+        """Convert the button to a dictionary."""
+        return {
+            "style": int(self.style),
+            "label": self.label,
+            "custom_id": self.custom_id,
+            "disabled": self.disabled,
+        }
 
 
 class ActionButton(Button):
@@ -87,19 +100,10 @@ class GoToFlowButton(ActionButton):
 
     async def trigger_action(self, flow_connector: FlowConnector):
         """Trigger the `GoToFlowButton`."""
-        flow: Flow | None = flow_connector.flow_manager.get_flow(self.flow_name)
+        flow = flow_connector.flow_manager.get_flow(self.flow_name)
 
         if not flow:
             raise ValueError(f"Flow with the name '{self.flow_name}' does not exist.")
 
         async with flow_connector.flow_manager:
             return await flow.run(flow_connector)
-
-
-class DataButton(Button):
-    def __init__(self, label: str, style: ButtonStyle, custom_id: str = None, **kwargs):
-        super().__init__(label=label, style=style, custom_id=custom_id)
-        self.kwargs = kwargs
-
-    async def callback(self, interaction: types.Interaction):
-        interaction.data = {**interaction.data, **self.kwargs}

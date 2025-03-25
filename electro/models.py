@@ -190,7 +190,6 @@ class Interaction(BaseModel):
 
     user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="interactions")
     channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="interactions")
-    message: fields.ForeignKeyRelation[Message] = fields.ForeignKeyField("electro.Message", related_name="interactions")
 
     custom_id = fields.CharField(max_length=255)
 

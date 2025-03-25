@@ -2,13 +2,12 @@
 
 import uvicorn
 
-from electro.app import app
 from electro import Flow, MessageFlowStep
-from electro.extra.i18n_gettext import templated_gettext as _
-
+from electro.app import app
 from electro.triggers import CommandTrigger
-
 from electro.flow_manager import global_flow_manager
+
+from .i18n_gettext import templated_gettext as _
 
 
 class TestFlow(Flow):

@@ -147,9 +147,7 @@ class GlobalAbstractChannel(str, Enum):
     DM_CHANNEL = "dm_channel"
 
 
-async def resolve_channel(
-    abstract_channel: GlobalAbstractChannel, user: types.User
-) -> types.Channel:
+async def resolve_channel(abstract_channel: GlobalAbstractChannel, user: types.User) -> types.Channel:
     """Resolve the channel by the name."""
     if abstract_channel == GlobalAbstractChannel.DM_CHANNEL:
         return await user.create_dm()

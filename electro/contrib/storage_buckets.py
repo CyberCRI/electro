@@ -540,4 +540,18 @@ class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBuck
     #     }
 
 
+class BaseAssistantsStorageBucket(BaseStorageBucket, ABC):
+    """Base storage bucket for the `GPTAssistantStep`s."""
+
+    __abstract = True
+
+    thread_id: StorageBucketElement[str]
+
+
+class BasePostgresAssistantsStorageBucket(BasePostgresStorageBucket, BaseAssistantsStorageBucket):
+    """Base storage bucket for the `GPTAssistantStep`s."""
+
+    __abstract = True
+
+
 # endregion

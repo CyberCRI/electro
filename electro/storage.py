@@ -12,8 +12,6 @@ from __future__ import annotations
 import typing
 from abc import ABC, abstractmethod
 
-from .toolkit import redis_storage
-
 DEFAULT_FLOW_STORAGE_PREFIX = "flow::"
 DEFAULT_MISSING_ADDRESS_PART = "missing"
 
@@ -182,75 +180,3 @@ class FlowMemoryStorage(BaseFlowStorage):
         self._user_data.clear()
         self._channel_states.clear()
         self._channel_data.clear()
-
-
-class FlowRedisStorage(BaseFlowStorage):
-    """The storage used for `Flow`. Stores data for all the users in Redis."""
-
-    _redis_storage: redis_storage.RedisStorage
-    _flow_storage_prefix: str
-
-    _missing_address_part: str
-
-    def __init__(
-        self,
-        storage: redis_storage.RedisStorage,
-        flow_storage_prefix: str = DEFAULT_FLOW_STORAGE_PREFIX,
-        missing_address_part: str = DEFAULT_MISSING_ADDRESS_PART,
-    ):
-        self._redis_storage = storage
-
-        self._flow_storage_prefix = flow_storage_prefix
-        self._missing_address_part = missing_address_part
-
-    async def get_user_state(self, user_id: int) -> str | None:
-        """Get the state for a user."""
-        return await self._redis_storage.get_state(chat=self._missing_address_part, user=user_id)
-
-    async def get_channel_state(self, channel_id: int) -> str | None:
-        """Get the state for a channel."""
-        return await self._redis_storage.get_state(chat=channel_id, user=self._missing_address_part)
-
-    async def set_user_state(self, user_id: int, state: str | None):
-        """Set the state for a user."""
-        await self._redis_storage.set_state(chat=self._missing_address_part, user=user_id, state=state)
-
-    async def set_channel_state(self, channel_id: int, state: str | None):
-        """Set the state for a channel."""
-        await self._redis_storage.set_state(chat=channel_id, user=self._missing_address_part, state=state)
-
-    async def delete_user_state(self, user_id: int):
-        """Delete the state for a user."""
-        await self._redis_storage.set_state(chat=self._missing_address_part, user=user_id, state=None)
-
-    async def delete_channel_state(self, channel_id: int):
-        """Delete the state for a channel."""
-        await self._redis_storage.set_state(chat=channel_id, user=self._missing_address_part, state=None)
-
-    async def get_user_data(self, user_id: int) -> UserData:
-        """Get the data for a user."""
-        return UserData(**await self._redis_storage.get_data(chat=self._missing_address_part, user=user_id))
-
-    async def get_channel_data(self, channel_id: int) -> ChannelData:
-        """Get the data for a channel."""
-        return ChannelData(**await self._redis_storage.get_data(chat=channel_id, user=self._missing_address_part))
-
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
-        """Set the data for a user."""
-        await self._redis_storage.set_data(chat=self._missing_address_part, user=user_id, data=dict(**data))
-
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
-        """Set the data for a channel."""
-        await self._redis_storage.set_data(chat=channel_id, user=self._missing_address_part, data=dict(**data))
-
-    async def delete_user_data(self, user_id: int):
-        """Delete the data for a user."""
-        await self._redis_storage.set_data(chat=self._missing_address_part, user=user_id, data=None)
-
-    async def delete_channel_data(self, channel_id: int):
-        """Delete the data for a channel."""
-        await self._redis_storage.set_data(chat=channel_id, user=self._missing_address_part, data=None)
-
-    async def clear(self):
-        """Clear the storage."""
-        await self._redis_storage.reset_all()

@@ -5,6 +5,7 @@ from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
+from .flow_connector import FlowConnectorEvents
 from .flow_manager import global_flow_manager
 from .interfaces import APIInterface, WebSocketInterface
 from .toolkit.tortoise_orm import get_tortoise_config
@@ -32,8 +33,19 @@ async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: st
     try:
         while websocket.application_state == WebSocketState.CONNECTED:
             data = await websocket.receive_json()
-            data = types.Message.model_validate(data)
-            await global_flow_manager.on_message(data, interface)
+            action = data.get("action")
+            content = data.get("content")
+            if action == FlowConnectorEvents.MESSAGE:
+                content = types.Message.model_validate(content)
+                await global_flow_manager.on_message(content, interface)
+            if action == FlowConnectorEvents.BUTTON_CLICK:
+                content = types.Interaction.model_validate(content)
+                await global_flow_manager.on_interaction(content, interface)
+            if action == FlowConnectorEvents.MEMBER_JOIN:
+                content = types.Member.model_validate(content)
+                await global_flow_manager.on_member_join(data, interface)
+            if action == FlowConnectorEvents.MEMBER_UPDATE:
+                pass
     except WebSocketDisconnect:
         await interface.disconnect()
 
