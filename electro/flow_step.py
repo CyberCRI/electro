@@ -9,13 +9,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from typing import Any
 
 import discord
 from openai import NOT_GIVEN
 
 # from decorators import with_constant_typing
-from .contrib.buttons import ActionButton
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
 from .flow_connector import FlowConnectorEvents
 from .models import File
@@ -29,6 +27,7 @@ from .types_ import Channel, MessageToSend
 
 if typing.TYPE_CHECKING:
     from .flow import FlowConnector
+    from .contrib.buttons import ActionButton
 
 
 class FlowStepDone(Exception):
@@ -111,6 +110,27 @@ class FilesMixin:
         files = [file for file in files if file]
 
         return files
+
+
+class StorageMixin(ABC):
+    answers_storage: StorageBucketElement | None = None
+
+    async def _get_user_answer(self) -> typing.Any:
+        """Get the user answer."""
+        if self.answers_storage:
+            async with self.answers_storage as answers_storage:
+                return answers_storage.get()
+
+    async def _set_user_answer(self, user_answer: typing.Any):
+        """Set the user answer."""
+        if self.answers_storage:
+            async with self.answers_storage as answers_storage:
+                answers_storage.set(user_answer)
+
+    async def clear_storage(self) -> None:
+        """Clear the storage."""
+        if self.answers_storage:
+            await self.answers_storage.delete_data()
 
 
 class CallbackHandlerStep(BaseFlowStep):
@@ -206,7 +226,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
 
     substitutions: dict[str, str] | None = None
 
-    buttons: typing.Dict[str, ActionButton] | None = None
+    buttons: typing.List[ActionButton] | None = None
 
     validator: typing.Callable[[str], bool] | None = None
     validator_error_message: TemplatedString | None = None
@@ -267,7 +287,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         message: MessageToSend = await self.send_message(
             connector,
             self.message,
-            buttons=self.buttons.values(),
+            buttons=self.buttons,
             channel=channel_to_send_to or connector.channel,
         )
 
@@ -287,11 +307,14 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     async def process_response(self, connector: FlowConnector):
         """Process the response. If the `.response_message` is set, send it."""
         if self.buttons and connector.event == FlowConnectorEvents.BUTTON_CLICK:
-            button = self.buttons.get(connector.button.custom_id)
+            button = [b for b in self.buttons if b.custom_id == connector.button.custom_id]
+            if len(button) > 1:
+                logger.error(f"Multiple buttons with the same custom id {connector.button.custom_id} in {self.buttons=}")
+                return
             if not button:
                 logger.error(f"Cannot find the button with custom id {connector.button.custom_id} in {self.buttons=}")
                 return
-            return await button.trigger_action(connector)
+            return await button[0].trigger_action(connector)
 
         # TODO: [23.11.2023 by Mykola] Use Whisper to transcribe the audio message into text
         if self.validator:
@@ -451,7 +474,7 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
                 and self.response_format == ChatGPTResponseFormat.JSON_OBJECT
             ):
                 try:
-                    response_to_save: Any = json.loads(prompt_response)
+                    response_to_save: typing.Any = json.loads(prompt_response)
                     logger.debug(f"Parsed the `{self.__class__.__name__}` JSON response: {response_to_save=}")
                 except json.JSONDecodeError:
                     logger.exception(

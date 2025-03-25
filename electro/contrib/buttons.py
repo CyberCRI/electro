@@ -3,9 +3,8 @@
 import typing
 from enum import Enum
 
-from .. import types_ as types
 from ..flow_connector import FlowConnector
-from ..flow_step import BaseFlowStep
+from ..flow_step import BaseFlowStep, FlowStepDone
 
 CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseFlowStep
 
@@ -38,6 +37,7 @@ class Button:
         style: ButtonStyle = ButtonStyle.primary,
         custom_id: str | None = None,
         disabled: bool = False,
+        remove_after_click: bool = False,
     ):
         super().__init__()
         if label and len(str(label)) > 80:
@@ -51,6 +51,7 @@ class Button:
         self.label = label
         self.custom_id = custom_id
         self.disabled = disabled
+        self.remove_after_click = remove_after_click
 
     def to_dict(self) -> dict[str, typing.Any]:
         """Convert the button to a dictionary."""
@@ -59,6 +60,7 @@ class Button:
             "label": self.label,
             "custom_id": self.custom_id,
             "disabled": self.disabled,
+            "remove_after_click": self.remove_after_click,
         }
 
 
@@ -107,3 +109,8 @@ class GoToFlowButton(ActionButton):
 
         async with flow_connector.flow_manager:
             return await flow.run(flow_connector)
+
+
+class ConfirmButton(ActionButton):
+    async def trigger_action(self, flow_connector: FlowConnector):
+        raise FlowStepDone
