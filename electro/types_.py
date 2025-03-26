@@ -74,7 +74,7 @@ class Button(ElectroBaseModel):
     user: User
     channel: Channel
     custom_id: str
-    clicked_at: bool = False
+    clicked: bool = False
 
 
 class Member(ElectroBaseModel):

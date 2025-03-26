@@ -409,7 +409,7 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, message: types.Message, interface: BaseInterface) -> list[Message] | None:
+    async def on_message(self, message: types.Message, interface: BaseInterface) -> list[types.MessageToSend] | None:
         """Handle the messages sent by the users."""
 
         # Save the message to the database
@@ -445,7 +445,7 @@ class FlowManager(ContextInstanceMixin):
 
         return await self.dispatch(flow_connector)
 
-    async def on_button_click(self, button: types.Button):
+    async def on_button_click(self, button: types.Button, interface: BaseInterface) -> list[types.MessageToSend] | None:
         """Handle the buttons clicked by the users."""
         # Save the button click to the database
         button_obj = await self.analytics_manager.save_button_click(button)
@@ -456,8 +456,8 @@ class FlowManager(ContextInstanceMixin):
         user_data = await self._get_user_data(button.user)
 
         # Get the channel state and data
-        channel_state = await self._get_channel_state(button.message.channel)
-        channel_data = await self._get_channel_data(button.message.channel)
+        channel_state = await self._get_channel_state(button.channel)
+        channel_data = await self._get_channel_data(button.channel)
 
         # noinspection PyTypeChecker
         flow_connector = FlowConnector(
@@ -472,6 +472,7 @@ class FlowManager(ContextInstanceMixin):
             button_obj=button_obj,
             channel_state=channel_state,
             channel_data=channel_data,
+            interface=interface,
         )
 
         return await self.dispatch(flow_connector)

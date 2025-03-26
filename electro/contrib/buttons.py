@@ -1,6 +1,7 @@
 """The buttons that can be used in the `electro` Framework."""
 
 import typing
+import uuid
 from enum import Enum
 
 from ..flow_connector import FlowConnector
@@ -35,21 +36,16 @@ class Button:
         self,
         label: str | None = None,
         style: ButtonStyle = ButtonStyle.primary,
-        custom_id: str | None = None,
         disabled: bool = False,
         remove_after_click: bool = False,
     ):
         super().__init__()
         if label and len(str(label)) > 80:
             raise ValueError("label must be 80 characters or fewer")
-        if custom_id is not None and len(str(custom_id)) > 100:
-            raise ValueError("custom_id must be 100 characters or fewer")
-        if not isinstance(custom_id, str) and custom_id is not None:
-            raise TypeError(f"expected custom_id to be str, not {custom_id.__class__.__name__}")
 
         self.style = style
         self.label = label
-        self.custom_id = custom_id
+        self.custom_id = str(uuid.uuid4())
         self.disabled = disabled
         self.remove_after_click = remove_after_click
 
@@ -112,5 +108,20 @@ class GoToFlowButton(ActionButton):
 
 
 class ConfirmButton(ActionButton):
+    def __init__(
+        self,
+        label: str | None = None,
+        style: ButtonStyle = ButtonStyle.primary,
+        disabled: bool = False,
+        remove_after_click: bool = True,
+    ):
+        super().__init__(
+            label=label,
+            style=style,
+            action_callback=None,
+            disabled=disabled,
+            remove_after_click=remove_after_click
+        )
+
     async def trigger_action(self, flow_connector: FlowConnector):
         raise FlowStepDone
