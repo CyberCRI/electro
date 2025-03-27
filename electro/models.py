@@ -162,10 +162,8 @@ class Message(BaseModel):
     """The model for Message."""
 
     id = fields.BigIntField(pk=True)
-
     author: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="messages")
     channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="messages")
-
     content = fields.TextField()
 
     created_at = fields.DatetimeField()
@@ -187,9 +185,9 @@ class Button(BaseModel):
     """The model for Button."""
 
     id = fields.BigIntField(pk=True)
-
     user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="buttons")
     channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="buttons")
+    message: ForeignKeyRelation[Message] = fields.ForeignKeyField("electro.Message", related_name="buttons")
     custom_id = fields.CharField(max_length=255)
     clicked = fields.BooleanField(default=False)
 
