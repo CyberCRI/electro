@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from enum import Enum
+
 from tortoise import fields
-from tortoise.fields import ForeignKeyRelation
+from tortoise.fields import ForeignKeyRelation, ManyToManyField
 
 from .toolkit.images_storage.storages_enums import StoragesIDs
 from .toolkit.tortoise_orm import Model
@@ -19,7 +21,6 @@ class BaseModel(Model):
 
     is_active = fields.BooleanField(default=True)
     is_deleted = fields.BooleanField(default=False)
-
     date_deleted = fields.DatetimeField(null=True)
 
     class Meta:  # pylint: disable=too-few-public-methods
@@ -28,20 +29,50 @@ class BaseModel(Model):
         abstract = True
 
 
-# region Discord Models
+# region Core Models
+
+
+class PlatformId(Model):
+    """
+    This model is used to store the IDs of the users, channels, and guilds on different platforms.
+
+    It is used to link the users, channels, and guilds on different platforms to the same user, channel, or guild in the database.
+
+    Attributes:
+        id (int): The ID of the platform ID.
+        type (str): The type of the platform ID. Can be "user", "channel", or "guild".
+        platform_id (str): The ID of the user, channel, or guild on the platform.
+        platform (str): The name of the platform.
+        user (User): The user associated with the platform ID.
+        channel (Channel): The channel associated with the platform ID.
+        guild (Guild): The guild associated with the platform ID.
+    """
+
+    class PlatformIdTypes(str, Enum):
+        """The types of platform IDs."""
+
+        USER = "user"
+        CHANNEL = "channel"
+        GUILD = "guild"
+
+    id = fields.IntField(pk=True)
+    type = fields.CharField(max_length=255)
+    platform_id = fields.CharField(max_length=255)
+    platform = fields.CharField(max_length=255)
+    user = fields.ForeignKeyField("electro.User", related_name="platform_ids", null=True)
+    channel = fields.ForeignKeyField("electro.Channel", related_name="platform_ids", null=True)
+    guild = fields.ForeignKeyField("electro.Guild", related_name="platform_ids", null=True)
+
+    class Meta:
+        unique_together = (("type", "platform_id", "platform"),)
+
+
 class User(BaseModel):
     """The model for Discord User."""
 
     id = fields.BigIntField(pk=True)
     username = fields.CharField(max_length=255)
-
-    discriminator = fields.IntField()
-    avatar = fields.CharField(max_length=255, null=True)
-
     locale = fields.CharField(max_length=255, null=True)
-
-    is_bot = fields.BooleanField(default=False)
-
     is_admin = fields.BooleanField(default=False)
 
     # guilds: fields.ManyToManyRelation["Guild"]  # TODO: [2024-08-30 by Mykola] Allow multiple guilds for the user.
@@ -49,36 +80,23 @@ class User(BaseModel):
         "electro.Guild", related_name="users", null=True
     )
 
+    platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
     state_changed: fields.ReverseRelation[UserStateChanged]
-
     files: fields.ReverseRelation[File]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"{self.username}#{self.discriminator}"
-
-    async def create_dm(self) -> Channel:
-        """
-        Create a DM channel with the user.
-        """
-        channel, _ = await Channel.get_or_create(id=self.id, defaults={"type": 1})
-        return channel
+        return self.username
 
 
 class File(BaseModel):
     """The model for the file."""
 
-    added_by_user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="files", null=True)
-
+    owner: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="files", null=True)
     storage_service: StoragesIDs = fields.CharEnumField(StoragesIDs, max_length=32)
-
     storage_file_object_key = fields.TextField()
-
     file_name = fields.TextField(null=True)
-
-    discord_attachment_id = fields.TextField(null=True)
-    discord_cdn_url = fields.TextField(null=True)
 
 
 class Guild(BaseModel):
@@ -87,52 +105,35 @@ class Guild(BaseModel):
     id = fields.BigIntField(pk=True)
     name = fields.CharField(max_length=255)
 
-    icon = fields.CharField(max_length=255, null=True)
-    banner = fields.CharField(max_length=255, null=True)
-    description = fields.TextField(null=True)
-    preferred_locale = fields.CharField(max_length=255, null=True)
-    afk_channel_id = fields.BigIntField(null=True)
-    afk_timeout = fields.IntField(null=True)
-    owner_id = fields.BigIntField(null=True)
+    platform_ids: fields.ReverseRelation[PlatformId]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return self.name
 
 
-class GuildMember(BaseModel):
-    """The model for Discord Guild Member."""
-
-    user = fields.ForeignKeyField("electro.User", related_name="guild_members")
-    guild = fields.ForeignKeyField("electro.Guild", related_name="guild_members")
-
-    nickname = fields.CharField(max_length=255, null=True)
-    joined_at = fields.DatetimeField(null=True)
-    premium_since = fields.DatetimeField(null=True)
-    deaf = fields.BooleanField(default=False)
-    mute = fields.BooleanField(default=False)
-
-    def __str__(self) -> str:
-        """Return the string representation of the model."""
-        return f"{self.user} in {self.guild}"
-
-
 class Channel(BaseModel):
     """The model for Discord Channel."""
 
+    class ChannelTypes(str, Enum):
+        """The types of Discord channels."""
+
+        DM = "dm"
+        CHANNEL = "channel"
+
     id = fields.BigIntField(pk=True)
     guild: Guild = fields.ForeignKeyField("electro.Guild", related_name="channels", null=True)
-
     name = fields.CharField(max_length=255, null=True)
     type = fields.CharField(max_length=255)
 
-    used_for: str = fields.CharField(max_length=255, null=True)
-
+    platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
+    bot_messages: fields.ReverseRelation[BotMessage]
+    buttons: fields.ReverseRelation[Button]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"{self.name} in {self.guild or 'DM'} (used for {self.used_for})"
+        return f"Channel `{self.name}` in {self.guild}"
 
 
 class Role(BaseModel):
@@ -154,26 +155,13 @@ class Role(BaseModel):
         return f"{self.name} in {self.guild}"
 
 
-# endregion Discord Models
-
-
-# region Analytics models
 class Message(BaseModel):
     """The model for Message."""
 
     id = fields.BigIntField(pk=True)
     author: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="messages")
-    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="messages")
+    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="messages", null=True)
     content = fields.TextField()
-
-    created_at = fields.DatetimeField()
-    edited_at = fields.DatetimeField(null=True)
-
-    is_pinned = fields.BooleanField(null=True)
-    is_tts = fields.BooleanField(null=True)
-
-    # Dynamically added fields
-    is_bot_message = fields.BooleanField(null=True)
     is_command = fields.BooleanField(null=True)
 
     def __str__(self) -> str:
@@ -181,19 +169,40 @@ class Message(BaseModel):
         return f"`{self.author}` Message: `{self.content}`."
 
 
+class BotMessage(BaseModel):
+    """The model for Bot Message."""
+
+    id = fields.BigIntField(pk=True)
+    receiver: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="bot_messages", null=True)
+    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField(
+        "electro.Channel", related_name="bot_messages", null=True
+    )
+    content = fields.TextField(null=True)
+
+    files: fields.ManyToManyRelation[File] = ManyToManyField("electro.File", related_name="bot_messages")
+    buttons: fields.ReverseRelation[Button]
+
+    def __str__(self) -> str:
+        """Return the string representation of the model."""
+        return f"`{self.receiver}` Bot Message: `{self.content}`."
+
+
 class Button(BaseModel):
     """The model for Button."""
 
     id = fields.BigIntField(pk=True)
-    user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="buttons")
-    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="buttons")
-    message: ForeignKeyRelation[Message] = fields.ForeignKeyField("electro.Message", related_name="buttons")
     custom_id = fields.CharField(max_length=255)
+    style = fields.IntField()
+    label = fields.CharField(max_length=255)
     clicked = fields.BooleanField(default=False)
+    remove_after_click = fields.BooleanField(default=False)
+    bot_message: ForeignKeyRelation[BotMessage] = fields.ForeignKeyField(
+        "electro.BotMessage", related_name="buttons", null=True
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"`{self.user}` Button `{self.custom_id}`."
+        return f"Button `{self.id}`."
 
 
 class UserStateChanged(BaseModel):
@@ -209,7 +218,7 @@ class UserStateChanged(BaseModel):
         return f"`{self.user}` State Changed: `{self.previous_state}` -> `{self.new_state}`."
 
 
-# endregion Analytics models
+# endregion Core Models
 
 
 # region Base storage models

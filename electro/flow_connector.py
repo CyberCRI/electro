@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
-from . import types_ as types
 from ._common import ContextInstanceMixin
+from .enums import SupportedPlatforms
 from .interfaces import BaseInterface
-from .models import Button, Message
+from .models import Button, Channel, Message, User
 from .storage import ChannelData, UserData
 
 if TYPE_CHECKING:
@@ -29,30 +29,19 @@ class FlowConnectorEvents(str, Enum):
 class FlowConnector(ContextInstanceMixin):
     """The connector that is passed from one `Flow` to another."""
 
-    # TODO: [05.09.2023 by Mykola] Forbid re-assigning the attributes of this class
-
     flow_manager: FlowManager
-
+    interface: BaseInterface
     event: FlowConnectorEvents
-
-    user: types.User | None
-    channel: types.Channel | None
 
     user_state: str | None
     user_data: UserData
-
     channel_state: str | None
     channel_data: ChannelData
 
-    message: types.Message | None = None
-    button: types.Button | None = None
+    user: User
+    channel: Channel
+    message: Message | None = None
+    button: Button | None = None
 
-    message_obj: Message | None = None
-    button_obj: Button | None = None
-
-    member: types.Member | None = None
     substitutions: dict[str, str] | None = None
-
     extra_data: dict[str, Any] | None = None
-
-    interface: BaseInterface | None = None

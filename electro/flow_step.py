@@ -16,18 +16,17 @@ from openai import NOT_GIVEN
 # from decorators import with_constant_typing
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
 from .flow_connector import FlowConnectorEvents
-from .models import File
+from .models import BotMessage, Button, Channel, File
 from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
 from .toolkit.loguru_logging import logger
 from .toolkit.openai_client import async_openai_client
 from .toolkit.templated_i18n import TemplatedString
-from .types_ import Channel, MessageToSend
 
 if typing.TYPE_CHECKING:
-    from .flow import FlowConnector
     from .contrib.buttons import ActionButton
+    from .flow import FlowConnector
 
 
 class FlowStepDone(Exception):
@@ -45,7 +44,7 @@ class BaseFlowStep(ABC):
     _testing: bool = False
 
     @abstractmethod
-    async def run(self, connector: FlowConnector) -> list[MessageToSend] | None:
+    async def run(self, connector: FlowConnector):
         """Run the `BaseFlowStep`. Called when the `BaseFlowStep` is started."""
         raise NotImplementedError
 
@@ -257,23 +256,29 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         message: TemplatedString | str,
         channel: Channel | BaseSubstitution[Channel] | None = None,
         buttons: typing.Optional[typing.List[ActionButton]] = None,
-    ) -> MessageToSend:
+    ):
         """Send the message."""
         message: str | None = (
             await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
         )
         files = await self._get_files_to_send(connector)
-        channel_to_send_to: Channel = await self._resolve_channel_to_send_to(
-            channel or self.channel_to_send_to, connector
+        channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
+        message = await BotMessage.create(
+            receiver=connector.user,
+            channel=channel_to_send_to,
+            content=message,
         )
-        buttons = buttons or []
-        await connector.interface.send_json(
-            {
-                "message": message,
-                "buttons": [button.to_dict() for button in buttons],
-                "to": channel_to_send_to.id,
-            }
-        )
+        buttons = [
+            await Button.create(
+                bot_message=message,
+                custom_id=button.custom_id,
+                style=button.style,
+                label=button.label,
+                remove_after_click=button.remove_after_click,
+            )
+            for button in buttons or []
+        ]
+        await connector.interface.send_message(message, buttons)
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @with_constant_typing()
@@ -281,25 +286,19 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         self,
         connector: FlowConnector,
         channel_to_send_to: Channel | BaseSubstitution | None = None,
-    ) -> MessageToSend | None:
+    ):
         """Run the `BaseFlowStep`."""
-
-        message: MessageToSend = await self.send_message(
+        await self.send_message(
             connector,
             self.message,
             buttons=self.buttons,
             channel=channel_to_send_to or connector.channel,
         )
-
         if self.non_blocking:
             await self.respond(connector)
-
             raise FlowStepDone()
 
-        # TODO: [2025-03-03 by Mykola] Allow sending multiple messages
-        return message
-
-    async def respond(self, connector: FlowConnector) -> MessageToSend:
+    async def respond(self, connector: FlowConnector):
         """Respond to the user."""
         if self.response_message:
             return await self.send_message(connector, self.response_message, channel=connector.channel)
@@ -309,7 +308,9 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         if self.buttons and connector.event == FlowConnectorEvents.BUTTON_CLICK:
             button = [b for b in self.buttons if b.custom_id == connector.button.custom_id]
             if len(button) > 1:
-                logger.error(f"Multiple buttons with the same custom id {connector.button.custom_id} in {self.buttons=}")
+                logger.error(
+                    f"Multiple buttons with the same custom id {connector.button.custom_id} in {self.buttons=}"
+                )
                 return
             if not button:
                 logger.error(f"Cannot find the button with custom id {connector.button.custom_id} in {self.buttons=}")
@@ -324,14 +325,12 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
                     if self.validator_error_message
                     else "Invalid input."
                 )
-
-                return await connector.interface.send_json(
-                    {
-                        "message": error_message,
-                        "buttons": [],
-                        "to": connector.channel.id,
-                    }
+                message = await BotMessage.create(
+                    receiver=connector.user,
+                    channel=connector.channel,
+                    content=error_message,
                 )
+                return await connector.interface.send_message(message)
 
         if self.save_response_to_storage:
             await self.save_response_to_storage.set_data(connector.message.content)
@@ -540,8 +539,6 @@ class AcceptFileStep(MessageFlowStep):
                         storage_service=settings.STORAGE_SERVICE_ID,
                         storage_file_object_key=file_object_key,
                         file_name=attachment.filename,
-                        discord_attachment_id=attachment.id,
-                        discord_cdn_url=attachment.url,
                     )
 
                 except Exception as exception:

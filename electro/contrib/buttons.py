@@ -116,11 +116,7 @@ class ConfirmButton(ActionButton):
         remove_after_click: bool = True,
     ):
         super().__init__(
-            label=label,
-            style=style,
-            action_callback=None,
-            disabled=disabled,
-            remove_after_click=remove_after_click
+            label=label, style=style, action_callback=None, disabled=disabled, remove_after_click=remove_after_click
         )
 
     async def trigger_action(self, flow_connector: FlowConnector):

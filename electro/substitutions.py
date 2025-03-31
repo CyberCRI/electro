@@ -6,8 +6,8 @@ import typing
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from . import types_ as types
 from .flow_connector import FlowConnector
+from .models import Channel, User
 from .toolkit.redis_storage import RedisStorage
 
 VALUE = typing.TypeVar("VALUE")
@@ -59,8 +59,8 @@ class ManualRedisStorageSubstitution(BaseSubstitution):
         self.is_chat_specific = is_chat_specific
 
     async def _resolve(self, connector: FlowConnector) -> str:
-        if not self.is_chat_specific and not isinstance(connector.channel, types.Channel):
-            channel = await connector.user.create_dm()
+        if not self.is_chat_specific and not isinstance(connector.channel, Channel):
+            channel = None
         else:
             channel = connector.channel
 
@@ -132,7 +132,7 @@ class BaseFlowSubstitutionObject(ABC):
 
 
 class UserSubstitutionObject(BaseFlowSubstitutionObject):
-    object: types.User
+    object: User
 
     flow_connector_attribute = "user"
 
@@ -147,10 +147,10 @@ class GlobalAbstractChannel(str, Enum):
     DM_CHANNEL = "dm_channel"
 
 
-async def resolve_channel(abstract_channel: GlobalAbstractChannel, user: types.User) -> types.Channel:
+async def resolve_channel(abstract_channel: GlobalAbstractChannel, user: User) -> Channel:
     """Resolve the channel by the name."""
     if abstract_channel == GlobalAbstractChannel.DM_CHANNEL:
-        return await user.create_dm()
+        return None
 
     raise ValueError(f"Unknown channel: {abstract_channel}")
 
