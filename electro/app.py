@@ -29,8 +29,8 @@ async def process_message(message: ReceivedMessage, platform: str):
     return await global_flow_manager.on_message(platform, message, interface)
 
 
-@app.websocket("/websocket/platform/{platform}")
-async def websocket_endpoint(websocket: WebSocket, platform: str):
+@app.websocket("/websocket/platform/{platform}/user/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, platform: str, user_id: str):
     if platform not in SupportedPlatforms:
         raise ValueError(f"Platform {platform} is not supported.")
     interface = WebSocketInterface()
