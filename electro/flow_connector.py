@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from ._common import ContextInstanceMixin
-from .enums import SupportedPlatforms
 from .interfaces import BaseInterface
 from .models import Button, Channel, Message, User
 from .storage import ChannelData, UserData

@@ -31,7 +31,7 @@ class AnalyticsManager(ContextInstanceMixin):
         self.set_current(self)
 
     @classmethod
-    async def get_or_create_guild(cls, platform: str, guild_data: schemas.Guild) -> schemas.Guild:
+    async def get_or_create_guild(cls, platform: str, guild_data: schemas.Guild) -> Guild:
         """Save the guild to the database."""
         platform_id, created = await PlatformId.get_or_create(
             platform_id=guild_data.platform_id.id, platform=platform, type=PlatformId.PlatformIdTypes.GUILD
@@ -55,7 +55,9 @@ class AnalyticsManager(ContextInstanceMixin):
             logger.info(f"Created the User record for {user.id=}, {user.username=}")
             await platform_id.save()
         if user_data.guild:
-            await cls.get_or_create_guild(platform, user_data.guild)
+            guild = await cls.get_or_create_guild(platform, user_data.guild)
+            user.guild = guild
+            await user.save()
         return await platform_id.user.get()
 
     @classmethod
@@ -73,7 +75,9 @@ class AnalyticsManager(ContextInstanceMixin):
             logger.info(f"Created the Channel record for {channel.id=}, {channel.name=}")
             await platform_id.save()
         if channel_data.guild:
-            await cls.get_or_create_guild(platform, channel_data.guild)
+            guild = await cls.get_or_create_guild(platform, channel_data.guild)
+            channel.guild = guild
+            await channel.save()
         return await platform_id.channel.get()
 
     @classmethod
@@ -84,7 +88,6 @@ class AnalyticsManager(ContextInstanceMixin):
             channel = await cls.get_or_create_channel(platform, message_data.channel)
         else:
             channel = None
-        logger.error(f"saaaam {message_data.content=}, {author=}, {channel=}")
         return await Message.create(
             content=message_data.content,
             author=author,

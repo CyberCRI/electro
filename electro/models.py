@@ -79,6 +79,9 @@ class User(BaseModel):
     guild: fields.ForeignKeyRelation[Guild] | Guild = fields.ForeignKeyField(
         "electro.Guild", related_name="users", null=True
     )
+    roles: fields.ManyToManyRelation[Role] = fields.ManyToManyField(
+        "electro.Role", related_name="users"
+    )
 
     platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
@@ -140,15 +143,10 @@ class Role(BaseModel):
     """The model for Discord Role."""
 
     id = fields.BigIntField(pk=True)
-
     guild: Guild = fields.ForeignKeyField("electro.Guild", related_name="roles")
-
     name = fields.CharField(max_length=255)
-    color = fields.IntField(null=True)
-    position = fields.IntField(null=True)
-    permissions = fields.IntField(null=True)
-    is_hoisted = fields.BooleanField(default=False)
-    is_mentionable = fields.BooleanField(default=False)
+
+    users: fields.ManyToManyRelation[User]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

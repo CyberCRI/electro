@@ -261,24 +261,10 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         message: str | None = (
             await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
         )
-        files = await self._get_files_to_send(connector)
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
-        message = await BotMessage.create(
-            receiver=connector.user,
-            channel=channel_to_send_to,
-            content=message,
-        )
-        buttons = [
-            await Button.create(
-                bot_message=message,
-                custom_id=button.custom_id,
-                style=button.style,
-                label=button.label,
-                remove_after_click=button.remove_after_click,
-            )
-            for button in buttons or []
-        ]
-        await connector.interface.send_message(message, buttons)
+        files = await self._get_files_to_send(connector)
+        await connector.interface.send_images(files, connector.user, channel_to_send_to)
+        await connector.interface.send_message(message, connector.user, channel_to_send_to, buttons)
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @with_constant_typing()
@@ -320,17 +306,12 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         # TODO: [23.11.2023 by Mykola] Use Whisper to transcribe the audio message into text
         if self.validator:
             if not self.validator(connector.message.content):
-                error_message = (
+                message = (
                     await self._get_formatted_message(self.validator_error_message, connector)
                     if self.validator_error_message
                     else "Invalid input."
                 )
-                message = await BotMessage.create(
-                    receiver=connector.user,
-                    channel=connector.channel,
-                    content=error_message,
-                )
-                return await connector.interface.send_message(message)
+                return await connector.interface.send_message(message, connector.user, connector.channel)
 
         if self.save_response_to_storage:
             await self.save_response_to_storage.set_data(connector.message.content)

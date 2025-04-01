@@ -9,3 +9,12 @@ class SupportedPlatforms(str, Enum):
     DISCORD = "discord"
     WHATSAPP = "whatsapp"
     CUSTOM = "custom"
+
+
+class ResponseTypes(str, Enum):
+    """The actions that can be processed by the clients."""
+
+    MESSAGE = "message"
+    IMAGES = "images"
+    ADD_ROLE = "add_role"
+    REMOVE_ROLE = "remove_role"
