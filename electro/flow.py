@@ -10,12 +10,11 @@ from stringcase import snakecase
 from .contrib.storage_buckets import BaseStorageBucket, BaseStorageBucketElement
 from .flow_connector import FlowConnector, FlowConnectorEvents
 from .flow_step import BaseFlowStep, FlowStepDone
-
-# from decorators import forbid_concurrent_execution, with_constant_typing
 from .models import BotMessage
 from .scopes import FlowScopes
 from .settings import settings
 from .substitutions import BaseSubstitution
+from .toolkit.decorators import with_constant_typing
 from .toolkit.loguru_logging import logger
 from .triggers import BaseFlowTrigger
 
@@ -238,7 +237,7 @@ class Flow(BaseFlow):
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @forbid_concurrent_execution()
-    # @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
+    @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
     ) -> list[BotMessage] | None:

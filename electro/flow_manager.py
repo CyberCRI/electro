@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from . import schemas
 from ._common import ContextInstanceMixin
-from .exceptions import EventCannotBeProcessed
+from .exceptions import DisabledButtonClick, EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
 
@@ -99,10 +99,11 @@ class AnalyticsManager(ContextInstanceMixin):
     async def save_button_click(cls, button_id: int) -> Button:
         """Save the button to the database."""
         # Get the user and channel objects (make sure they exist in the database
-        button, _ = await Button.update_or_create(
-            id=button_id,
-            defaults={"clicked": True},
-        )
+        button = await Button.get(id=button_id)
+        if button.clicked and button.remove_after_click:
+            raise DisabledButtonClick
+        button.clicked = True
+        await button.save()
         return button
 
     @classmethod
@@ -364,9 +365,12 @@ class FlowManager(ContextInstanceMixin):
     async def on_button_click(self, platform: str, button_data: schemas.ButtonClick, interface: BaseInterface):
         """Handle the buttons clicked by the users."""
         # Save the button click to the database
-        button = await self.analytics_manager.save_button_click(button_data.id)
         user = await self.analytics_manager.get_or_create_user(platform, button_data.user)
         channel = await self.analytics_manager.get_or_create_channel(platform, button_data.channel)
+        try:
+            button = await self.analytics_manager.save_button_click(button_data.id)
+        except DisabledButtonClick:
+            return await interface.send_message("button already clicked", user, channel)
 
         # Get the user state and data
         user_state = await self._get_user_state(user)

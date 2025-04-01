@@ -68,7 +68,7 @@ class PlatformId(Model):
 
 
 class User(BaseModel):
-    """The model for Discord User."""
+    """The model for User."""
 
     id = fields.BigIntField(pk=True)
     username = fields.CharField(max_length=255)
@@ -101,7 +101,7 @@ class File(BaseModel):
 
 
 class Guild(BaseModel):
-    """The model for Discord Guild."""
+    """The model for Guild."""
 
     id = fields.BigIntField(pk=True)
     name = fields.CharField(max_length=255)
@@ -114,10 +114,10 @@ class Guild(BaseModel):
 
 
 class Channel(BaseModel):
-    """The model for Discord Channel."""
+    """The model for Channel."""
 
     class ChannelTypes(str, Enum):
-        """The types of Discord channels."""
+        """The types of channels."""
 
         DM = "dm"
         CHANNEL = "channel"
@@ -138,7 +138,7 @@ class Channel(BaseModel):
 
 
 class Role(BaseModel):
-    """The model for Discord Role."""
+    """The model for Role."""
 
     id = fields.BigIntField(pk=True)
     guild: Guild = fields.ForeignKeyField("electro.Guild", related_name="roles")

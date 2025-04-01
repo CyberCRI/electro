@@ -62,3 +62,14 @@ class AzureBlobStorageService(BaseStorageService):
             except ResourceNotFoundError:
                 raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.")
             return BytesIO(await image_data.readall())
+
+    async def get_image_url(self, object_key: str) -> str:
+        """Get the URL of an image in the Azure Blob Storage."""
+        async with await self.blob_service_client as client:
+            container_client = client.get_container_client(self.container_name)
+            blob_client = container_client.get_blob_client(object_key)
+            try:
+                url = blob_client.url
+            except ResourceNotFoundError:
+                raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.")
+            return url

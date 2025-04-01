@@ -4,4 +4,6 @@
 class EventCannotBeProcessed(Exception):
     """The exception that is raised when the event cannot be processed."""
 
-    pass
+
+class DisabledButtonClick(Exception):
+    """The exception that is raised when the button click is disabled."""

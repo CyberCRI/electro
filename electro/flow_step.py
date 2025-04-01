@@ -11,17 +11,16 @@ from enum import Enum
 from io import BytesIO
 
 import discord
-from openai import NOT_GIVEN
+from openai import AsyncOpenAI, NOT_GIVEN
 
-# from decorators import with_constant_typing
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
 from .flow_connector import FlowConnectorEvents
-from .models import BotMessage, Button, Channel, File
+from .models import Channel, File
 from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
+from .toolkit.decorators import with_constant_typing
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
 from .toolkit.loguru_logging import logger
-from .toolkit.openai_client import async_openai_client
 from .toolkit.templated_i18n import TemplatedString
 
 if typing.TYPE_CHECKING:
@@ -154,8 +153,7 @@ class CallbackHandlerStep(BaseFlowStep):
 
         self._step = None
 
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @with_constant_typing()
+    @with_constant_typing()
     async def run(self, connector: FlowConnector):
         try:
             result = await self.callback(connector)
@@ -266,8 +264,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         await connector.interface.send_images(files, connector.user, channel_to_send_to)
         await connector.interface.send_message(message, connector.user, channel_to_send_to, buttons)
 
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @with_constant_typing()
+    @with_constant_typing()
     async def run(
         self,
         connector: FlowConnector,
@@ -374,6 +371,8 @@ class ChatGPTMixin:
     @staticmethod
     async def get_response_from_chat_gpt(
         prompt: str,
+        openai_client: AsyncOpenAI,
+        chat_completion_model: str,
         system_message: str | None = None,
         response_format: ChatGPTResponseFormat = ChatGPTResponseFormat.AUTO,
     ) -> str:
@@ -409,8 +408,8 @@ class ChatGPTMixin:
             )
         )
 
-        completion = await async_openai_client.chat.completions.create(
-            model=settings.OPENAI_CHAT_COMPLETION_MODEL, messages=completion_messages, response_format=response_format
+        completion = await openai_client.chat.completions.create(
+            model=chat_completion_model, messages=completion_messages, response_format=response_format
         )
 
         message = completion.choices[0].message
@@ -422,6 +421,9 @@ class ChatGPTMixin:
 @dataclass
 class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
     """The Step that gets the response from the ChatGPT API for sending a message."""
+
+    openai_client: AsyncOpenAI | None = None
+    chat_completion_model: str | None = None
 
     message_prompt: TemplatedString | None = None
     response_message_prompt: TemplatedString | None = None
@@ -441,6 +443,8 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
 
         prompt_response = await self.get_response_from_chat_gpt(
             await super()._get_formatted_message(self.message_prompt, connector, **kwargs),
+            self.openai_client,
+            self.chat_completion_model,
             response_format=self.response_format,
         )
 

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
 
@@ -94,10 +95,12 @@ class BaseInterface(ABC):
             for button in buttons or []
         ]
         data = {
-            "id": bot_message.id,
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "content": message,
+            "content": {
+                "id": bot_message.id,
+                "message": bot_message.content,
+            },
             "buttons": await self._format_buttons(button_objects),
         }
         await self.send_json(
@@ -109,7 +112,7 @@ class BaseInterface(ABC):
 
     async def send_images(
         self,
-        images: List[File],
+        images: List[Union[File], str],
         user: Optional[User],
         channel: Optional[Channel],
         buttons: Optional[List["ActionButton"]] = None,
@@ -132,8 +135,8 @@ class BaseInterface(ABC):
             "channel": await self._format_channel(channel),
             "images": [
                 {
-                    "id": image.id,
-                    "file_name": image.file_name,
+                    # "id": image.id,
+                    "file_name": image.filename,
                     # "url": image.url,
                 }
                 for image in images
@@ -174,6 +177,26 @@ class BaseInterface(ABC):
                 },
             }
         )
+
+    async def set_typing(self, user: User, channel: Channel, action: ResponseTypes):
+        if action not in [ResponseTypes.START_TYPING, ResponseTypes.STOP_TYPING]:
+            raise ValueError("Action must be either `START_TYPING` or `STOP_TYPING`.")
+        await self.send_json(
+            {
+                "action": action.value,
+                "content": {
+                    "receiver": await self._format_user(user),
+                    "channel": await self._format_channel(channel),
+                },
+            }
+        )
+
+    @asynccontextmanager
+    async def with_constant_typing(self, user: User, channel: Channel):
+        """An asynchronous context manager for typing indicators or other tasks."""
+        await self.set_typing(user, channel, ResponseTypes.START_TYPING)
+        yield
+        await self.set_typing(user, channel, ResponseTypes.STOP_TYPING)
 
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):

@@ -71,13 +71,6 @@ class Settings(BaseSettings):
 
     HTTPX_CLIENT_DEFAULT_TIMEOUT: int = 60
 
-    # TODO: [06.03.2024 by Mykola] Do not let it be `None`. It's `None` only because we want to let `spinx` import it
-    #  while building the documentation.
-    OPENAI_API_KEY: str | None = "sk_test_1234567890"
-
-    OPENAI_CHAT_COMPLETION_MODEL: str = "gpt-4o"
-    OPENAI_DALLE_MODEL: str = "dall-e-3"
-
     DEFAULT_SLEEP_TIME: int = 3  # seconds
     SLEEP_TIME_PER_CHARACTER: float = 0.05
 
