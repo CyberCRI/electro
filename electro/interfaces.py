@@ -112,7 +112,7 @@ class BaseInterface(ABC):
 
     async def send_images(
         self,
-        images: List[Union[File], str],
+        images: List[Union[File, str]],
         user: Optional[User],
         channel: Optional[Channel],
         buttons: Optional[List["ActionButton"]] = None,
