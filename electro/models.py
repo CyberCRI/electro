@@ -79,9 +79,7 @@ class User(BaseModel):
     guild: fields.ForeignKeyRelation[Guild] | Guild = fields.ForeignKeyField(
         "electro.Guild", related_name="users", null=True
     )
-    roles: fields.ManyToManyRelation[Role] = fields.ManyToManyField(
-        "electro.Role", related_name="users"
-    )
+    roles: fields.ManyToManyRelation[Role] = fields.ManyToManyField("electro.Role", related_name="users")
 
     platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]

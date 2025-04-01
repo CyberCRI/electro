@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from fastapi import WebSocket
 
 from .enums import ResponseTypes
-from .contrib.buttons import ActionButton
-from .models import BotMessage, Button, File, User, Role, Channel, Guild
-from .toolkit.loguru_logging import logger
+from .models import BotMessage, Button, Channel, File, Guild, Role, User
+
+if TYPE_CHECKING:
+    from .contrib.buttons import ActionButton
 
 
 class BaseInterface(ABC):
@@ -28,7 +29,7 @@ class BaseInterface(ABC):
             }
             for button in buttons
         ]
-    
+
     async def _format_user(self, user: Optional[User]) -> Dict[str, Any]:
         """
         Format the user to be sent to the client.
@@ -39,11 +40,10 @@ class BaseInterface(ABC):
             "id": user.id,
             "username": user.username,
             "platform_ids": {
-                identifier.platform: identifier.platform_id
-                for identifier in await user.platform_ids.all()
+                identifier.platform: identifier.platform_id for identifier in await user.platform_ids.all()
             },
         }
-    
+
     async def _format_channel(self, channel: Optional[Channel]) -> Dict[str, Any]:
         """
         Format the channel to be sent to the client.
@@ -54,8 +54,7 @@ class BaseInterface(ABC):
             "id": channel.id,
             "name": channel.name,
             "platform_ids": {
-                identifier.platform: identifier.platform_id
-                for identifier in await channel.platform_ids.all()
+                identifier.platform: identifier.platform_id for identifier in await channel.platform_ids.all()
             },
         }
 
@@ -69,12 +68,17 @@ class BaseInterface(ABC):
             "id": guild.id,
             "name": guild.name,
             "platform_ids": {
-                identifier.platform: identifier.platform_id
-                for identifier in await guild.platform_ids.all()
+                identifier.platform: identifier.platform_id for identifier in await guild.platform_ids.all()
             },
         }
 
-    async def send_message(self, message: str, user: User, channel: Channel, buttons: Optional[List[ActionButton]] = None):
+    async def send_message(
+        self,
+        message: str,
+        user: Optional[User],
+        channel: Optional[Channel],
+        buttons: Optional[List["ActionButton"]] = None,
+    ):
         """
         Send a formatted message to the client by using `format_message`.
         """
@@ -102,9 +106,13 @@ class BaseInterface(ABC):
                 "content": data,
             }
         )
-    
+
     async def send_images(
-        self, images: List[File], user: User, channel: Channel, buttons: Optional[List[ActionButton]] = None
+        self,
+        images: List[File],
+        user: Optional[User],
+        channel: Optional[Channel],
+        buttons: Optional[List["ActionButton"]] = None,
     ):
         """
         Send images to the client.
@@ -138,7 +146,7 @@ class BaseInterface(ABC):
                 "content": data,
             }
         )
-    
+
     async def add_role(self, user: User, role: Role):
         await self.send_json(
             {
@@ -167,7 +175,6 @@ class BaseInterface(ABC):
             }
         )
 
-    
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):
         """
@@ -198,7 +205,7 @@ class WebSocketInterface(BaseInterface):
     async def disconnect(self):
         await self.interface.close()
         self.interface = None
-    
+
     async def stop_process(self, code: int = 1000, reason: Optional[str] = None):
         await self.interface.close(code, reason)
 
