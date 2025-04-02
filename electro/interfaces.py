@@ -6,6 +6,7 @@ from fastapi import WebSocket
 
 from .enums import ResponseTypes
 from .models import BotMessage, Button, Channel, File, Guild, Role, User
+from .toolkit.images_storage.universal_image_storage import universal_image_storage
 
 if TYPE_CHECKING:
     from .contrib.buttons import ActionButton
@@ -13,7 +14,8 @@ if TYPE_CHECKING:
 
 class BaseInterface(ABC):
     """
-    Interface class for the Electro framework."""
+    Interface class for the Electro framework.
+    """
 
     async def _format_buttons(self, buttons: List[Button]) -> List[Dict[str, Any]]:
         """
@@ -112,7 +114,7 @@ class BaseInterface(ABC):
 
     async def send_images(
         self,
-        images: List[Union[File, str]],
+        images: List[File],
         user: Optional[User],
         channel: Optional[Channel],
         buttons: Optional[List["ActionButton"]] = None,
@@ -133,19 +135,46 @@ class BaseInterface(ABC):
         data = {
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "images": [
-                {
-                    # "id": image.id,
-                    "file_name": image.filename,
-                    # "url": image.url,
-                }
-                for image in images
-            ],
+            "images": [await universal_image_storage.get_image_url(image.storage_file_object_key) for image in images],
             "buttons": await self._format_buttons(button_objects),
         }
         await self.send_json(
             {
                 "action": ResponseTypes.IMAGES,
+                "content": data,
+            }
+        )
+
+    async def send_static_images(
+        self,
+        images: List[str],
+        user: Optional[User],
+        channel: Optional[Channel],
+        buttons: Optional[List["ActionButton"]] = None,
+        action: ResponseTypes = ResponseTypes.STATIC_IMAGES,
+    ):
+        """
+        Send static images to the client.
+        """
+        button_objects = [
+            await Button.create(
+                bot_message=None,
+                custom_id=button.custom_id,
+                style=button.style,
+                label=button.label,
+                remove_after_click=button.remove_after_click,
+            )
+            for button in buttons or []
+        ]
+        data = {
+            "receiver": await self._format_user(user),
+            "channel": await self._format_channel(channel),
+            "images": images,
+            "buttons": await self._format_buttons(button_objects),
+        }
+        await self.send_json(
+            {
+                "action": action,
                 "content": data,
             }
         )

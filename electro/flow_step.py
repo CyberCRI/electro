@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
 
-import discord
 from openai import AsyncOpenAI, NOT_GIVEN
 
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
+from .enums import ResponseTypes
 from .flow_connector import FlowConnectorEvents
 from .models import Channel, File
 from .settings import settings
@@ -86,28 +86,36 @@ class MessageFormatterMixin:
 
 @dataclass(kw_only=True)
 class FilesMixin:
-    file: discord.File | typing.BinaryIO | pathlib.Path | BaseSubstitution | None = None
-    files: list[discord.File | typing.BinaryIO | pathlib.Path | BaseSubstitution] | None = None
+    files: list[File | typing.BinaryIO | BaseSubstitution] | None = None
 
-    async def _get_files_to_send(self, connector: FlowConnector) -> list[discord.File]:
+    async def _create_file_from_bytes(self, connector: FlowConnector, file: typing.BinaryIO) -> File:
+        """Create a `File` object from bytes."""
+        file_io = BytesIO(file.read())
+        file_object_key = await universal_image_storage.upload_image(file_io)
+        return await File.create(
+            owner=connector.user,
+            storage_service=settings.STORAGE_SERVICE_ID,
+            storage_file_object_key=file_object_key,
+        )
+
+    async def _get_files_to_send(self, connector: FlowConnector) -> list[File]:
         """Get the files to send."""
-        if self.file and self.files:
-            # TODO: [18.11.2023 by Mykola] Use `overload` to type-hint prohibit both `file` and `files` at the same time
-            raise ValueError("You can't specify both `file` and `files`.")
-
         # Resolve the files if they are `BaseSubstitution`s
-        files: list[discord.File | typing.BinaryIO | pathlib.Path | None] = [
+        files: list[File | typing.BinaryIO] = [
             await file.resolve(connector) if file and isinstance(file, BaseSubstitution) else file
-            for file in (self.files or ([self.file] if self.file else []))
+            for file in self.files or []
         ]
-
-        # Convert the files to `discord.File`s if they are not
-        files = [file if isinstance(file, discord.File) else (discord.File(file) if file else None) for file in files]
-
-        # Remove the `None`s
-        files = [file for file in files if file]
-
-        return files
+        files = [
+            (
+                file
+                if isinstance(file, File)
+                else (
+                    await self._create_file_from_bytes(connector, file) if isinstance(file, typing.BinaryIO) else None
+                )
+            )
+            for file in files
+        ]
+        return [file for file in files if file]
 
 
 class StorageMixin(ABC):
@@ -332,6 +340,8 @@ class DirectMessageFlowStep(MessageFlowStep):
 class SendImageFlowStep(MessageFlowStep):
     """The Step that sends an image."""
 
+    file: pathlib.Path | None = None
+
     language: str | None = None
 
     force_blocking_step: bool = False
@@ -345,15 +355,35 @@ class SendImageFlowStep(MessageFlowStep):
         # If the language is set, try to use the language-specific file
         if self.language:
             language = self.language.lower()
-            language_specific_file = self.file.with_stem(f"{self.file.stem}__{language}")
-
-            if language_specific_file.exists():
-                self.file = language_specific_file
-            else:
+            file, extention = str(self.file).rsplit(".", 1)
+            language_specific_file = f"{file}__{language}.{extention}"
+            try:
+                with open(language_specific_file, "rb"):
+                    self.file = language_specific_file
+            except FileNotFoundError:
                 logger.warning(
                     f"In step {self.__class__.__name__}: "
                     f"Language-specific file {language_specific_file} does not exist. Using the default."
                 )
+        self.file = str(self.file)
+
+    async def send_message(
+        self,
+        connector: FlowConnector,
+        message: TemplatedString | str,
+        channel: Channel | BaseSubstitution[Channel] | None = None,
+        buttons: typing.Optional[typing.List[ActionButton]] = None,
+    ):
+        """Send the message."""
+        message: str | None = (
+            await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
+        )
+        channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
+        # if gif
+        action = ResponseTypes.STATIC_GIFS if self.file.endswith(".gif") else ResponseTypes.STATIC_IMAGES
+        await connector.interface.send_static_images(
+            [self.file], connector.user, channel_to_send_to, buttons=buttons, action=action
+        )
 
 
 # TODO: [26.09.2023 by Mykola] Move to a separate file

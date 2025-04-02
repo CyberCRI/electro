@@ -94,7 +94,7 @@ class User(BaseModel):
 class File(BaseModel):
     """The model for the file."""
 
-    owner: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="files", null=True)
+    owner: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", null=True)
     storage_service: StoragesIDs = fields.CharEnumField(StoragesIDs, max_length=32)
     storage_file_object_key = fields.TextField()
     file_name = fields.TextField(null=True)
@@ -130,7 +130,6 @@ class Channel(BaseModel):
     platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
     bot_messages: fields.ReverseRelation[BotMessage]
-    buttons: fields.ReverseRelation[Button]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
