@@ -41,7 +41,7 @@ class AnalyticsManager(ContextInstanceMixin):
             platform_id.guild = guild
             logger.info(f"Created the Guild record for {guild.id=}, {guild.name=}")
             await platform_id.save()
-        return await platform_id.guild.get()
+        return await platform_id.guild
 
     @classmethod
     async def get_or_create_user(cls, platform: str, user_data: schemas.User) -> User:
@@ -58,7 +58,7 @@ class AnalyticsManager(ContextInstanceMixin):
             guild = await cls.get_or_create_guild(platform, user_data.guild)
             user.guild = guild
             await user.save()
-        return await platform_id.user.get()
+        return await platform_id.user
 
     @classmethod
     async def get_or_create_channel(cls, platform: str, channel_data: schemas.Channel) -> Channel:
@@ -78,7 +78,7 @@ class AnalyticsManager(ContextInstanceMixin):
             guild = await cls.get_or_create_guild(platform, channel_data.guild)
             channel.guild = guild
             await channel.save()
-        return await platform_id.channel.get()
+        return await platform_id.channel
 
     @classmethod
     async def save_message(cls, platform: str, message_data: schemas.ReceivedMessage) -> Message:
@@ -331,8 +331,8 @@ class FlowManager(ContextInstanceMixin):
 
         # Save the message to the database
         message = await self.analytics_manager.save_message(platform, message_data)
-        user = await message.author.get()
-        channel = await message.channel.get() if message.channel else None
+        user = await message.author
+        channel = await message.channel
 
         # Get the user state and data
         # TODO: [20.08.2023 by Mykola] Use context manager for this
