@@ -365,7 +365,6 @@ class SendImageFlowStep(MessageFlowStep):
                     f"In step {self.__class__.__name__}: "
                     f"Language-specific file {language_specific_file} does not exist. Using the default."
                 )
-        self.file = str(self.file)
 
     async def send_message(
         self,
@@ -379,10 +378,10 @@ class SendImageFlowStep(MessageFlowStep):
             await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
-        # if gif
-        action = ResponseTypes.STATIC_GIFS if self.file.endswith(".gif") else ResponseTypes.STATIC_IMAGES
+        file = str(self.file)
+        action = ResponseTypes.STATIC_GIFS if file.endswith(".gif") else ResponseTypes.STATIC_IMAGES
         await connector.interface.send_static_images(
-            [self.file], connector.user, channel_to_send_to, buttons=buttons, action=action
+            [file], connector.user, channel_to_send_to, buttons=buttons, action=action
         )
 
 
