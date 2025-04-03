@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: str | None = None
 
     AZURE_STORAGE_ACCOUNT_NAME: str | None = None
-
+    AZURE_ACCOUNT_KEY: str | None = None
     AZURE_CONTAINER_NAME: str = "files"
 
     HTTPX_CLIENT_DEFAULT_TIMEOUT: int = 60

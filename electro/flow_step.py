@@ -240,6 +240,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     save_response_to_storage: StorageBucketElement | None = None
 
     non_blocking: bool = False
+    delete_after: int | None = None
     _testing: bool = False
 
     @staticmethod
@@ -269,7 +270,8 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         files = await self._get_files_to_send(connector)
-        await connector.interface.send_images(files, connector.user, channel_to_send_to)
+        for file in files:
+            await connector.interface.send_image(file, connector.user, channel_to_send_to)
         await connector.interface.send_message(message, connector.user, channel_to_send_to, buttons)
 
     @with_constant_typing()
@@ -379,9 +381,9 @@ class SendImageFlowStep(MessageFlowStep):
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         file = str(self.file)
-        action = ResponseTypes.STATIC_GIFS if file.endswith(".gif") else ResponseTypes.STATIC_IMAGES
-        await connector.interface.send_static_images(
-            [file], connector.user, channel_to_send_to, buttons=buttons, action=action
+        action = ResponseTypes.STATIC_GIF if file.endswith(".gif") else ResponseTypes.STATIC_IMAGE
+        await connector.interface.send_static_image(
+            file, connector.user, channel_to_send_to, buttons=buttons, action=action
         )
 
 

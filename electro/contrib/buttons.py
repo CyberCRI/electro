@@ -7,7 +7,7 @@ from enum import Enum
 from ..flow_connector import FlowConnector
 from ..flow_step import BaseFlowStep, FlowStepDone
 
-CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseFlowStep
+CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseFlowStep | None
 
 
 class ButtonStyle(Enum):
@@ -49,23 +49,13 @@ class Button:
         self.disabled = disabled
         self.remove_after_click = remove_after_click
 
-    def to_dict(self) -> dict[str, typing.Any]:
-        """Convert the button to a dictionary."""
-        return {
-            "style": int(self.style),
-            "label": self.label,
-            "custom_id": self.custom_id,
-            "disabled": self.disabled,
-            "remove_after_click": self.remove_after_click,
-        }
-
 
 class ActionButton(Button):
     """A button that performs an action when clicked."""
 
     action_callback: CALLBACK_TYPE
 
-    def __init__(self, label: str, action_callback: CALLBACK_TYPE, *args, **kwargs):
+    def __init__(self, label: str, action_callback: CALLBACK_TYPE = None, *args, **kwargs):
         """Initialize the `ActionButton`."""
         super().__init__(label=label, *args, **kwargs)
 
@@ -79,10 +69,11 @@ class ActionButton(Button):
 
     async def trigger_action(self, flow_connector: FlowConnector):
         """Trigger the `ActionButton`."""
-        if isinstance(self.action_callback, BaseFlowStep):
-            await self.action_callback.run(flow_connector)
-        else:
-            await self.action_callback(flow_connector)
+        if self.action_callback:
+            if isinstance(self.action_callback, BaseFlowStep):
+                await self.action_callback.run(flow_connector)
+            else:
+                await self.action_callback(flow_connector)
 
 
 class GoToFlowButton(ActionButton):

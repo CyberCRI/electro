@@ -15,9 +15,9 @@ class ResponseTypes(str, Enum):
     """The actions that can be processed by the clients."""
 
     MESSAGE = "message"
-    IMAGES = "images"
-    STATIC_IMAGES = "static_images"
-    STATIC_GIFS = "static_gifs"
+    IMAGE = "image"
+    STATIC_IMAGE = "static_image"
+    STATIC_GIF = "static_gif"
     ADD_ROLE = "add_role"
     REMOVE_ROLE = "remove_role"
     START_TYPING = "start_typing"

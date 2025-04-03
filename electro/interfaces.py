@@ -81,6 +81,7 @@ class BaseInterface(ABC):
         user: Optional[User],
         channel: Optional[Channel],
         buttons: Optional[List["ActionButton"]] = None,
+        delete_after: Optional[int] = None,
     ):
         """
         Send a formatted message to the client by using `format_message`.
@@ -99,11 +100,9 @@ class BaseInterface(ABC):
         data = {
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "content": {
-                "id": bot_message.id,
-                "message": bot_message.content,
-            },
+            "message": bot_message.content,
             "buttons": await self._format_buttons(button_objects),
+            "delete_after": delete_after,
         }
         await self.send_json(
             {
@@ -112,16 +111,20 @@ class BaseInterface(ABC):
             }
         )
 
-    async def send_images(
+    async def send_image(
         self,
-        images: List[File],
+        image: File,
         user: Optional[User],
         channel: Optional[Channel],
+        caption: Optional[str] = None,
         buttons: Optional[List["ActionButton"]] = None,
+        delete_after: Optional[int] = None,
     ):
         """
         Send images to the client.
         """
+        if buttons and not caption:
+            raise ValueError("A caption must be provided when sending an image with buttons.")
         button_objects = [
             await Button.create(
                 bot_message=None,
@@ -135,27 +138,39 @@ class BaseInterface(ABC):
         data = {
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "images": [await universal_image_storage.get_image_url(image.storage_file_object_key) for image in images],
+            "image": await universal_image_storage.get_image_url(image.storage_file_object_key),
+            "caption": caption,
             "buttons": await self._format_buttons(button_objects),
+            "delete_after": delete_after,
         }
         await self.send_json(
             {
-                "action": ResponseTypes.IMAGES,
+                "action": ResponseTypes.IMAGE,
                 "content": data,
             }
         )
 
-    async def send_static_images(
+    async def send_static_image(
         self,
-        images: List[str],
+        image: str,
         user: Optional[User],
         channel: Optional[Channel],
+        caption: Optional[str] = None,
         buttons: Optional[List["ActionButton"]] = None,
-        action: ResponseTypes = ResponseTypes.STATIC_IMAGES,
+        action: ResponseTypes = ResponseTypes.STATIC_IMAGE,
+        delete_after: Optional[int] = None,
     ):
         """
         Send static images to the client.
         """
+        if action not in [ResponseTypes.STATIC_IMAGE, ResponseTypes.STATIC_GIF]:
+            raise ValueError("action must be either `STATIC_IMAGE` or `STATIC_GIF`.")
+        if action == ResponseTypes.STATIC_GIF and buttons:
+            raise ValueError("action `STATIC_GIF` does not support buttons.")
+        if action == ResponseTypes.STATIC_GIF and caption:
+            raise ValueError("action `STATIC_GIF` does not support caption.")
+        if buttons and not caption:
+            raise ValueError("A caption must be provided when sending an image with buttons.")
         button_objects = [
             await Button.create(
                 bot_message=None,
@@ -169,8 +184,9 @@ class BaseInterface(ABC):
         data = {
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "images": images,
+            "image": image,
             "buttons": await self._format_buttons(button_objects),
+            "delete_after": delete_after,
         }
         await self.send_json(
             {
