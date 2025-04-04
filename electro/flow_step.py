@@ -89,34 +89,13 @@ class MessageFormatterMixin:
 class FilesMixin:
     files: list[File | typing.BinaryIO | BaseSubstitution] | None = None
 
-    async def _create_file_from_bytes(self, connector: FlowConnector, file: typing.BinaryIO) -> File:
-        """Create a `File` object from bytes."""
-        file_io = BytesIO(file.read())
-        file_object_key = await universal_image_storage.upload_image(file_io)
-        return await File.create(
-            owner=connector.user,
-            storage_service=settings.STORAGE_SERVICE_ID,
-            storage_file_object_key=file_object_key,
-        )
-
     async def _get_files_to_send(self, connector: FlowConnector) -> list[File]:
         """Get the files to send."""
         # Resolve the files if they are `BaseSubstitution`s
-        files: list[File | typing.BinaryIO] = [
+        return [
             await file.resolve(connector) if file and isinstance(file, BaseSubstitution) else file
             for file in self.files or []
         ]
-        files = [
-            (
-                file
-                if isinstance(file, File)
-                else (
-                    await self._create_file_from_bytes(connector, file) if isinstance(file, typing.BinaryIO) else None
-                )
-            )
-            for file in files
-        ]
-        return [file for file in files if file]
 
 
 class StorageMixin(ABC):
