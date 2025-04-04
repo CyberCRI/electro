@@ -1,11 +1,14 @@
+import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
+from io import BytesIO
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
 
 from .enums import ResponseTypes
 from .models import BotMessage, Button, Channel, File, Guild, Role, User
+from .settings import settings
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
 
 if TYPE_CHECKING:
@@ -113,7 +116,7 @@ class BaseInterface(ABC):
 
     async def send_image(
         self,
-        image: File,
+        image: File | BytesIO | str | pathlib.Path,
         user: Optional[User],
         channel: Optional[Channel],
         caption: Optional[str] = None,
@@ -125,6 +128,17 @@ class BaseInterface(ABC):
         """
         if buttons and not caption:
             raise ValueError("A caption must be provided when sending an image with buttons.")
+        if isinstance(image, BytesIO) and caption:
+            raise ValueError("A caption cannot be provided when sending an image as a BytesIO object.")
+        if isinstance(image, File):
+            image_url = await universal_image_storage.get_image_url(image.storage_file_object_key)
+        else:
+            image_url = str(image)
+        if image_url.startswith(settings.APP_ROOT):
+            image_url = settings.SERVER_URL + image_url[len(settings.APP_ROOT) :]
+        if str(image_url).endswith(".gif") and (buttons or caption):
+            raise ValueError("GIFs do not support buttons or captions.")
+
         button_objects = [
             await Button.create(
                 bot_message=None,
@@ -138,7 +152,7 @@ class BaseInterface(ABC):
         data = {
             "receiver": await self._format_user(user),
             "channel": await self._format_channel(channel),
-            "image": await universal_image_storage.get_image_url(image.storage_file_object_key),
+            "image": image_url,
             "caption": caption,
             "buttons": await self._format_buttons(button_objects),
             "delete_after": delete_after,
@@ -146,51 +160,6 @@ class BaseInterface(ABC):
         await self.send_json(
             {
                 "action": ResponseTypes.IMAGE,
-                "content": data,
-            }
-        )
-
-    async def send_static_image(
-        self,
-        image: str,
-        user: Optional[User],
-        channel: Optional[Channel],
-        caption: Optional[str] = None,
-        buttons: Optional[List["ActionButton"]] = None,
-        action: ResponseTypes = ResponseTypes.STATIC_IMAGE,
-        delete_after: Optional[int] = None,
-    ):
-        """
-        Send static images to the client.
-        """
-        if action not in [ResponseTypes.STATIC_IMAGE, ResponseTypes.STATIC_GIF]:
-            raise ValueError("action must be either `STATIC_IMAGE` or `STATIC_GIF`.")
-        if action == ResponseTypes.STATIC_GIF and buttons:
-            raise ValueError("action `STATIC_GIF` does not support buttons.")
-        if action == ResponseTypes.STATIC_GIF and caption:
-            raise ValueError("action `STATIC_GIF` does not support caption.")
-        if buttons and not caption:
-            raise ValueError("A caption must be provided when sending an image with buttons.")
-        button_objects = [
-            await Button.create(
-                bot_message=None,
-                custom_id=button.custom_id,
-                style=button.style,
-                label=button.label,
-                remove_after_click=button.remove_after_click,
-            )
-            for button in buttons or []
-        ]
-        data = {
-            "receiver": await self._format_user(user),
-            "channel": await self._format_channel(channel),
-            "image": image,
-            "buttons": await self._format_buttons(button_objects),
-            "delete_after": delete_after,
-        }
-        await self.send_json(
-            {
-                "action": action,
                 "content": data,
             }
         )

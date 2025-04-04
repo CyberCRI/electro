@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
+from urllib.parse import urlparse
 
 from openai import AsyncOpenAI, NOT_GIVEN
 
@@ -342,7 +343,8 @@ class DirectMessageFlowStep(MessageFlowStep):
 class SendImageFlowStep(MessageFlowStep):
     """The Step that sends an image."""
 
-    file: pathlib.Path | None = None
+    file: File | pathlib.Path | BytesIO | str | None = None
+    caption: str | None = None
 
     language: str | None = None
 
@@ -355,7 +357,7 @@ class SendImageFlowStep(MessageFlowStep):
             self.non_blocking = True
 
         # If the language is set, try to use the language-specific file
-        if self.language:
+        if self.language and isinstance(self.file, pathlib.Path):
             language = self.language.lower()
             file, extention = str(self.file).rsplit(".", 1)
             language_specific_file = f"{file}__{language}.{extention}"
@@ -380,10 +382,8 @@ class SendImageFlowStep(MessageFlowStep):
             await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
-        file = str(self.file)
-        action = ResponseTypes.STATIC_GIF if file.endswith(".gif") else ResponseTypes.STATIC_IMAGE
-        await connector.interface.send_static_image(
-            file, connector.user, channel_to_send_to, buttons=buttons, action=action
+        await connector.interface.send_image(
+            self.file, connector.user, channel_to_send_to, caption=self.caption, buttons=buttons
         )
 
 
