@@ -2,7 +2,7 @@ import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from io import BytesIO
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from fastapi import WebSocket
 
@@ -101,7 +101,7 @@ class BaseInterface(ABC):
             for button in buttons or []
         ]
         data = {
-            "receiver": await self._format_user(user),
+            "user": await self._format_user(user),
             "channel": await self._format_channel(channel),
             "message": bot_message.content,
             "buttons": await self._format_buttons(button_objects),
@@ -150,7 +150,7 @@ class BaseInterface(ABC):
             for button in buttons or []
         ]
         data = {
-            "receiver": await self._format_user(user),
+            "user": await self._format_user(user),
             "channel": await self._format_channel(channel),
             "image": image_url,
             "caption": caption,
@@ -169,11 +169,9 @@ class BaseInterface(ABC):
             {
                 "action": ResponseTypes.ADD_ROLE,
                 "content": {
-                    "role": {
-                        "name": role.name,
-                        "guild": await self._format_guild(role.guild),
-                        "user": await self._format_user(user),
-                    },
+                    "role": role.name,
+                    "guild": await self._format_guild(role.guild),
+                    "user": await self._format_user(user),
                 },
             }
         )
@@ -183,11 +181,9 @@ class BaseInterface(ABC):
             {
                 "action": ResponseTypes.REMOVE_ROLE,
                 "content": {
-                    "role": {
-                        "name": role.name,
-                        "guild": await self._format_guild(role.guild),
-                        "user": await self._format_user(user),
-                    },
+                    "role": role.name,
+                    "guild": await self._format_guild(role.guild),
+                    "user": await self._format_user(user),
                 },
             }
         )
@@ -199,7 +195,7 @@ class BaseInterface(ABC):
             {
                 "action": action.value,
                 "content": {
-                    "receiver": await self._format_user(user),
+                    "user": await self._format_user(user),
                     "channel": await self._format_channel(channel),
                 },
             }
