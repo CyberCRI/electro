@@ -12,7 +12,7 @@ from .settings import settings
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
 
 if TYPE_CHECKING:
-    from .contrib.buttons import ActionButton
+    from .contrib.buttons import BaseButton
 
 
 class BaseInterface(ABC):
@@ -20,21 +20,33 @@ class BaseInterface(ABC):
     Interface class for the Electro framework.
     """
 
-    async def _format_buttons(self, buttons: List[Button]) -> List[Dict[str, Any]]:
+    async def _create_and_format_buttons(
+        self, buttons: Optional[List["BaseButton"]] = None, bot_message: Optional[BotMessage] = None
+    ) -> List[Button]:
         """
         Format the buttons to be sent to the client.
         """
-        return [
-            {
-                "id": button.id,
-                "custom_id": button.custom_id,
-                "style": button.style,
-                "label": button.label,
-                "clicked": button.clicked,
-                "remove_after_click": button.remove_after_click,
-            }
-            for button in buttons
-        ]
+        response = []
+        for button in buttons or []:
+            button_object = await Button.create(
+                bot_message=bot_message,
+                custom_id=button.custom_id,
+                style=button.style,
+                label=button.label,
+                remove_after_click=button.remove_after_click,
+                extra_data=getattr(button, "extra_data", {}),
+            )
+            response.append(
+                {
+                    "id": button_object.id,
+                    "custom_id": button_object.custom_id,
+                    "style": button_object.style,
+                    "label": button_object.label,
+                    "clicked": button_object.clicked,
+                    "remove_after_click": button_object.remove_after_click,
+                }
+            )
+        return response
 
     async def _format_user(self, user: Optional[User]) -> Dict[str, Any]:
         """
@@ -83,28 +95,18 @@ class BaseInterface(ABC):
         message: str,
         user: Optional[User],
         channel: Optional[Channel],
-        buttons: Optional[List["ActionButton"]] = None,
+        buttons: Optional[List["BaseButton"]] = None,
         delete_after: Optional[int] = None,
     ):
         """
         Send a formatted message to the client by using `format_message`.
         """
         bot_message = await BotMessage.create(receiver=user, channel=channel, content=message)
-        button_objects = [
-            await Button.create(
-                bot_message=bot_message,
-                custom_id=button.custom_id,
-                style=button.style,
-                label=button.label,
-                remove_after_click=button.remove_after_click,
-            )
-            for button in buttons or []
-        ]
         data = {
             "user": await self._format_user(user),
             "channel": await self._format_channel(channel),
             "message": bot_message.content,
-            "buttons": await self._format_buttons(button_objects),
+            "buttons": await self._create_and_format_buttons(buttons, bot_message),
             "delete_after": delete_after,
         }
         await self.send_json(
@@ -120,7 +122,7 @@ class BaseInterface(ABC):
         user: Optional[User],
         channel: Optional[Channel],
         caption: Optional[str] = None,
-        buttons: Optional[List["ActionButton"]] = None,
+        buttons: Optional[List["BaseButton"]] = None,
         delete_after: Optional[int] = None,
     ):
         """
@@ -128,8 +130,6 @@ class BaseInterface(ABC):
         """
         if buttons and not caption:
             raise ValueError("A caption must be provided when sending an image with buttons.")
-        if isinstance(image, BytesIO) and caption:
-            raise ValueError("A caption cannot be provided when sending an image as a BytesIO object.")
         if isinstance(image, File):
             image_url = await universal_image_storage.get_image_url(image.storage_file_object_key)
         elif isinstance(image, BytesIO):
@@ -147,22 +147,12 @@ class BaseInterface(ABC):
         if str(image_url).endswith(".gif") and (buttons or caption):
             raise ValueError("GIFs do not support buttons or captions.")
 
-        button_objects = [
-            await Button.create(
-                bot_message=None,
-                custom_id=button.custom_id,
-                style=button.style,
-                label=button.label,
-                remove_after_click=button.remove_after_click,
-            )
-            for button in buttons or []
-        ]
         data = {
             "user": await self._format_user(user),
             "channel": await self._format_channel(channel),
             "image": image_url,
             "caption": caption,
-            "buttons": await self._format_buttons(button_objects),
+            "buttons": await self._create_and_format_buttons(buttons),
             "delete_after": delete_after,
         }
         await self.send_json(

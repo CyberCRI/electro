@@ -122,10 +122,18 @@ class Channel(BaseModel):
         DM = "dm"
         CHANNEL = "channel"
 
+    class ChannelUsedFor(str, Enum):
+        GLOBAL_ERRORS = "global_errors"
+        MEANING_CARDS = "meaning_cards"
+        CAUSE_CARDS = "cause_cards"
+        IKIGAI_CARDS = "ikigai_cards"
+        PROFESSION_CARDS = "profession_cards"
+
     id = fields.BigIntField(pk=True)
     guild: Guild = fields.ForeignKeyField("electro.Guild", related_name="channels", null=True)
     name = fields.CharField(max_length=255, null=True)
     type = fields.CharField(max_length=255)
+    used_for = fields.CharEnumField(ChannelUsedFor, max_length=255, null=True)
 
     platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
@@ -191,6 +199,7 @@ class Button(BaseModel):
     label = fields.CharField(max_length=255)
     clicked = fields.BooleanField(default=False)
     remove_after_click = fields.BooleanField(default=False)
+    extra_data = fields.JSONField(null=True)
     bot_message: ForeignKeyRelation[BotMessage] = fields.ForeignKeyField(
         "electro.BotMessage", related_name="buttons", null=True
     )

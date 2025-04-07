@@ -2,6 +2,7 @@
 
 import typing
 import uuid
+from abc import ABC
 from enum import Enum
 
 from ..flow_connector import FlowConnector
@@ -29,7 +30,7 @@ class ButtonStyle(Enum):
         return self.value
 
 
-class Button:
+class BaseButton(ABC):
     """The base class for buttons."""
 
     def __init__(
@@ -39,7 +40,6 @@ class Button:
         disabled: bool = False,
         remove_after_click: bool = False,
     ):
-        super().__init__()
         if label and len(str(label)) > 80:
             raise ValueError("label must be 80 characters or fewer")
 
@@ -50,7 +50,22 @@ class Button:
         self.remove_after_click = remove_after_click
 
 
-class ActionButton(Button):
+class DataButton(BaseButton):
+    """A button that can store data."""
+
+    def __init__(
+        self,
+        label: str | None = None,
+        style: ButtonStyle = ButtonStyle.primary,
+        disabled: bool = False,
+        remove_after_click: bool = False,
+        **kwargs,
+    ):
+        super().__init__(label, style, disabled, remove_after_click)
+        self.extra_data = kwargs
+
+
+class ActionButton(BaseButton):
     """A button that performs an action when clicked."""
 
     action_callback: CALLBACK_TYPE
