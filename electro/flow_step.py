@@ -449,7 +449,7 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
             return await super()._get_formatted_message(message, connector, **kwargs)
 
         # Send the typing indicator
-        await connector.channel.trigger_typing()
+        # await connector.interface.set_typing(connector.user, connector.channel, action=ResponseTypes.START_TYPING)
 
         prompt_response = await self.get_response_from_chat_gpt(
             await super()._get_formatted_message(self.message_prompt, connector, **kwargs),
