@@ -1,0 +1,13 @@
+[MAIN]
+
+max-line-length=120
+
+disable=
+    E0401,  # Import error: Ignored because imports actually work
+    R0801,  # Duplicate code
+    R0903,  # Too few public methods
+    C0114,  # Missing module docstring
+    C0302,  # Too many lines in module
+    W0511,  # TODO
+    R0913,  # Too many arguments
+    R0917,  # Too many positional arguments
