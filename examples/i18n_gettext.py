@@ -1,7 +1,7 @@
 import gettext
 
-from ..settings import settings
-from ..toolkit.templated_i18n import make_templated_gettext
+from electro.settings import settings
+from electro.toolkit.templated_i18n import make_templated_gettext
 
 # Set up `gettext`
 en = gettext.translation("messages", localedir=settings.LOCALES_PATH, languages=[settings.BOT_LANGUAGE])

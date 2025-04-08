@@ -20,14 +20,6 @@ electro.toolkit.buttons module
    :show-inheritance:
    :undoc-members:
 
-electro.toolkit.discord\_tweeks module
---------------------------------------
-
-.. automodule:: electro.toolkit.discord_tweeks
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 electro.toolkit.loguru\_logging module
 --------------------------------------
 

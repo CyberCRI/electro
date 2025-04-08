@@ -25,6 +25,10 @@ class UniversalImageStorage:
         """Download an image from the storage service."""
         return await self.storage_service.download_image(object_key)
 
+    async def get_image_url(self, object_key: str) -> str:
+        """Get the URL of the image from the storage service."""
+        return await self.storage_service.get_image_url(object_key)
+
 
 STORAGES_IDS_TO_SERVICES = {
     StoragesIDs.S3: S3Service,

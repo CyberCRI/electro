@@ -4,9 +4,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
-from . import types_ as types
+from .enums import SupportedPlatforms
+from .flow_connector import FlowConnectorEvents
 from .flow_manager import global_flow_manager
 from .interfaces import APIInterface, WebSocketInterface
+from .schemas import ButtonClick, ReceivedMessage
 from .toolkit.tortoise_orm import get_tortoise_config
 
 app = FastAPI(
@@ -18,22 +20,36 @@ app = FastAPI(
 )
 
 
-@app.post("/message")
-async def process_message(message: types.Message) -> types.MessageToSend | None:
+@app.post("/message/platform/{platform}/")
+async def process_message(message: ReceivedMessage, platform: str):
     """Process the message."""
+    if platform not in SupportedPlatforms:
+        raise ValueError(f"Platform {platform} is not supported.")
     interface = APIInterface()
-    return await global_flow_manager.on_message(message, interface)
+    return await global_flow_manager.on_message(platform, message, interface)
 
 
-@app.websocket("/websocket/client/{client_name}/user/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, client_name: str, user_id: str):
+@app.websocket("/websocket/platform/{platform}/user/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, platform: str, user_id: str):
+    if platform not in SupportedPlatforms:
+        raise ValueError(f"Platform {platform} is not supported.")
     interface = WebSocketInterface()
     await interface.connect(websocket)
     try:
         while websocket.application_state == WebSocketState.CONNECTED:
             data = await websocket.receive_json()
-            data = types.Message.model_validate(data)
-            await global_flow_manager.on_message(data, interface)
+            action = data.get("action")
+            content = data.get("content")
+            if action == FlowConnectorEvents.MESSAGE:
+                content = ReceivedMessage.model_validate(content)
+                await global_flow_manager.on_message(platform, content, interface)
+            if action == FlowConnectorEvents.BUTTON_CLICK:
+                content = ButtonClick.model_validate(content)
+                await global_flow_manager.on_button_click(platform, content, interface)
+            if action == FlowConnectorEvents.MEMBER_JOIN:
+                pass
+            if action == FlowConnectorEvents.MEMBER_UPDATE:
+                pass
     except WebSocketDisconnect:
         await interface.disconnect()
 

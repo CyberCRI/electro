@@ -7,15 +7,14 @@ from abc import ABC, ABCMeta, abstractmethod
 
 from stringcase import snakecase
 
-from . import types_ as types
 from .contrib.storage_buckets import BaseStorageBucket, BaseStorageBucketElement
 from .flow_connector import FlowConnector, FlowConnectorEvents
 from .flow_step import BaseFlowStep, FlowStepDone
+from .models import BotMessage
 from .scopes import FlowScopes
-
-# from decorators import forbid_concurrent_execution, with_constant_typing
 from .settings import settings
 from .substitutions import BaseSubstitution
+from .toolkit.decorators import with_constant_typing
 from .toolkit.loguru_logging import logger
 from .triggers import BaseFlowTrigger
 
@@ -145,14 +144,12 @@ class BaseFlow(ABC, metaclass=FlowMeta):
     @abstractmethod
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    ) -> list[BotMessage] | None:
         """Process the response in the current step of the `Flow`."""
         raise NotImplementedError
 
     @abstractmethod
-    async def run(
-        self, connector: FlowConnector, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    async def run(self, connector: FlowConnector, upper_level_state: str | None = None) -> list[BotMessage] | None:
         """Start the `Flow`."""
         raise NotImplementedError
 
@@ -219,9 +216,7 @@ class Flow(BaseFlow):
         """Update the connector before running the `Flow`."""
         return connector
 
-    async def run(
-        self, connector: FlowConnector, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    async def run(self, connector: FlowConnector, upper_level_state: str | None = None) -> list[BotMessage] | None:
         """Start the `Flow`."""
         # Make sure there are steps in the `Flow`
         if not self._steps:
@@ -242,10 +237,10 @@ class Flow(BaseFlow):
 
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @forbid_concurrent_execution()
-    # @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
+    @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    ) -> list[BotMessage] | None:
         """
         Process the response in the current step of the `Flow`.
 

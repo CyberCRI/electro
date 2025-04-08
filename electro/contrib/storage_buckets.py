@@ -455,6 +455,8 @@ class PostgresStorageBucketMeta(StorageBucketMeta):
 
         # Set the storage elements from annotations
         for attr_name, attr_type in (merged_bases_annotations | cls.__annotations__).items():
+            resolved_annotations = typing.get_type_hints(cls)
+            attr_type = resolved_annotations.get(attr_name, attr_type)
             if (not attr_name.startswith("_")) and issubclass(get_origin(attr_type), BaseStorageBucketElement):
                 element_class: Type[PostgresStorageBucketElement] = (
                     PostgresStorageBucketElement
@@ -538,6 +540,20 @@ class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBuck
     #             if name in cls._meta.m2m_fields
     #         ],
     #     }
+
+
+class BaseAssistantsStorageBucket(BaseStorageBucket, ABC):
+    """Base storage bucket for the `GPTAssistantStep`s."""
+
+    __abstract = True
+
+    thread_id: StorageBucketElement[str]
+
+
+class BasePostgresAssistantsStorageBucket(BasePostgresStorageBucket, BaseAssistantsStorageBucket):
+    """Base storage bucket for the `GPTAssistantStep`s."""
+
+    __abstract = True
 
 
 # endregion

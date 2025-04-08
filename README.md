@@ -31,4 +31,4 @@ A framework for building bots, made for humans.
    ```
 
 6. Check the API server @ http://localhost:8000/docs.
-7. Use one of the clients to connect the platforms: [Discord](https://github.com/CyberCRI/ikigai-discord-client).
+7. Use one of the clients to connect the platforms: [Whatsapp](https://github.com/CyberCRI/ikigai-whatsapp-bot).

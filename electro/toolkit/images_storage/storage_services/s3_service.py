@@ -95,3 +95,19 @@ class S3Service(BaseStorageService):
         except Exception as e:
             logger.error(f"Failed to download image: {e}")
             raise
+
+    async def get_image_url(self, object_key: str) -> str:
+        """Returns the URL of the image.
+
+        :param object_key: object key of the image
+        :return: URL of the image
+
+        """
+        async with self.session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL) as s3:
+            try:
+                url = f"{settings.S3_ENDPOINT_URL}/{self.bucket_name}/{object_key}"
+                logger.info(f"Image URL: {url}")
+                return url
+            except Exception as e:
+                logger.error(f"Failed to get image URL: {e}")
+                raise

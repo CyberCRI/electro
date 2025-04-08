@@ -20,7 +20,6 @@ redis = "^5.0.7"
 tortoise-orm = {extras = ["asyncpg"], version = "^0.21.5"}
 aerich = "^0.7.2"
 tenacity = "^8.5.0"
-py-cord = {git = "https://github.com/mykolasolodukha/pycord.git", rev = "d8070a90a8ec12dbc64b703513c14fa80834861d"}
 aioboto3 = "^13.1.1"
 azure-storage-blob = "^12.23.1"
 azure-identity = "^1.18.0"

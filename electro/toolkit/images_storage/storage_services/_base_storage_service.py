@@ -26,3 +26,13 @@ class BaseStorageService(ABC):
 
         """
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_image_url(self, object_key: str) -> str:
+        """Returns the URL of the image.
+
+        :param object_key: object key of the image
+        :return: URL of the image
+
+        """
+        raise NotImplementedError
