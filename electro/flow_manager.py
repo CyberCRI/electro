@@ -77,18 +77,22 @@ class AnalyticsManager(ContextInstanceMixin):
             logger.info(f"Created the Channel record for {channel.id=}, {channel.name=}")
             await platform_id.save()
         if channel_data.guild:
+            logger.error(f"{channel_data=}, {channel_data.guild=}")
             guild = await cls.get_or_create_guild(platform, channel_data.guild)
             channel.guild = guild
             await channel.save()
+        channel = await platform_id.channel
         if user and channel.type == Channel.ChannelTypes.DM:
             if not user.dm_channel:
                 user.dm_channel = channel
                 await user.save()
+                return channel
             elif created:
                 platform_id.channel = user.dm_channel
                 await platform_id.save()
                 await channel.delete()
-        return await platform_id.channel
+                return await platform_id.channel
+        return channel
 
     @classmethod
     async def save_message(cls, platform: str, message_data: schemas.ReceivedMessage) -> Message:
