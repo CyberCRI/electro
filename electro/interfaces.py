@@ -1,3 +1,4 @@
+import contextvars
 import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
@@ -246,10 +247,11 @@ class WebSocketInterface(BaseInterface):
 
 class APIInterface(BaseInterface):
     def __init__(self):
-        self.messages = []
+        self.messages = contextvars.ContextVar("messages")
+        self.messages.set([])
 
-    async def send_json(self, data: Dict[str, Any]):
-        self.messages.append(data)
+    async def send_json(self, data: Dict[str, str]):
+        self.messages.get().append(data)
 
     async def stop_process(self, *args, **kwargs):
-        return self.messages
+        return self.messages.get()
