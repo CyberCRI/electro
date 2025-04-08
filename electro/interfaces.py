@@ -72,6 +72,7 @@ class BaseInterface(ABC):
         return {
             "id": channel.id,
             "name": channel.name,
+            "type": channel.type,
             "platform_ids": {
                 identifier.platform: identifier.platform_id for identifier in await channel.platform_ids.all()
             },

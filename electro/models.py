@@ -76,6 +76,9 @@ class User(BaseModel):
     is_admin = fields.BooleanField(default=False)
 
     # guilds: fields.ManyToManyRelation["Guild"]  # TODO: [2024-08-30 by Mykola] Allow multiple guilds for the user.
+    dm_channel: fields.ForeignKeyRelation[Channel] | Channel = fields.ForeignKeyField(
+        "electro.Channel", related_name="dm_users", null=True
+    )
     guild: fields.ForeignKeyRelation[Guild] | Guild = fields.ForeignKeyField(
         "electro.Guild", related_name="users", null=True
     )

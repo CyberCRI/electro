@@ -61,7 +61,9 @@ class AnalyticsManager(ContextInstanceMixin):
         return await platform_id.user
 
     @classmethod
-    async def get_or_create_channel(cls, platform: str, channel_data: schemas.Channel) -> Channel:
+    async def get_or_create_channel(
+        cls, platform: str, channel_data: schemas.Channel, user: typing.Optional[User] = None
+    ) -> Channel:
         """Save the channel to the database."""
         platform_id, created = await PlatformId.get_or_create(
             platform_id=channel_data.platform_id.id, platform=platform, type=PlatformId.PlatformIdTypes.CHANNEL
@@ -78,6 +80,14 @@ class AnalyticsManager(ContextInstanceMixin):
             guild = await cls.get_or_create_guild(platform, channel_data.guild)
             channel.guild = guild
             await channel.save()
+        if user and channel.type == Channel.ChannelTypes.DM:
+            if not user.dm_channel:
+                user.dm_channel = channel
+                await user.save()
+            elif created:
+                platform_id.channel = user.dm_channel
+                await platform_id.save()
+                await channel.delete()
         return await platform_id.channel
 
     @classmethod
@@ -85,7 +95,7 @@ class AnalyticsManager(ContextInstanceMixin):
         """Save the message to the database."""
         author = await cls.get_or_create_user(platform, message_data.author)
         if message_data.channel:
-            channel = await cls.get_or_create_channel(platform, message_data.channel)
+            channel = await cls.get_or_create_channel(platform, message_data.channel, author)
         else:
             channel = None
         return await Message.create(
@@ -366,7 +376,7 @@ class FlowManager(ContextInstanceMixin):
         """Handle the buttons clicked by the users."""
         # Save the button click to the database
         user = await self.analytics_manager.get_or_create_user(platform, button_data.user)
-        channel = await self.analytics_manager.get_or_create_channel(platform, button_data.channel)
+        channel = await self.analytics_manager.get_or_create_channel(platform, button_data.channel, user)
         try:
             button = await self.analytics_manager.save_button_click(button_data.id)
         except DisabledButtonClick:
