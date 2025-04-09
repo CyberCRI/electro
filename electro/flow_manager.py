@@ -12,13 +12,15 @@ from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
 
 # from decorators import fail_safely
-from .interfaces import BaseInterface
 from .models import Button, Channel, Guild, Message, PlatformId, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
+
+if typing.TYPE_CHECKING:
+    from .interfaces import BaseInterface
 
 
 class AnalyticsManager(ContextInstanceMixin):

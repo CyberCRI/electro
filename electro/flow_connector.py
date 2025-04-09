@@ -7,12 +7,13 @@ from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from ._common import ContextInstanceMixin
-from .interfaces import BaseInterface
 from .models import Button, Channel, Message, User
 from .storage import ChannelData, UserData
 
 if TYPE_CHECKING:
     from electro import FlowManager
+
+    from .interfaces import BaseInterface
 
 
 class FlowConnectorEvents(str, Enum):

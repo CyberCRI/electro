@@ -3,12 +3,15 @@ import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from io import BytesIO
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
 
 from .enums import ResponseTypes
+from .flow_connector import FlowConnectorEvents
+from .flow_manager import global_flow_manager
 from .models import BotMessage, Button, Channel, File, Guild, Role, User
+from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
 
@@ -98,7 +101,7 @@ class BaseInterface(ABC):
         user: Optional[User],
         channel: Optional[Channel],
         buttons: Optional[List["BaseButton"]] = None,
-        delete_after: Optional[int] = None,
+        delete_after: Optional[Union[int, str]] = None,
     ):
         """
         Send a formatted message to the client by using `format_message`.
@@ -208,6 +211,23 @@ class BaseInterface(ABC):
         yield
         await self.set_typing(user, channel, ResponseTypes.STOP_TYPING)
 
+    async def handle_incoming_action(self, platform: str, data: Dict[str, Any]) -> Tuple[Dict[str, str], int]:
+        """
+        Handle incoming actions from the client.
+        """
+        action = data.get("action")
+        content = data.get("content")
+        if action == FlowConnectorEvents.MESSAGE:
+            content = ReceivedMessage.model_validate(content)
+            await global_flow_manager.on_message(platform, content, self)
+        if action == FlowConnectorEvents.BUTTON_CLICK:
+            content = ButtonClick.model_validate(content)
+            await global_flow_manager.on_button_click(platform, content, self)
+        if action == FlowConnectorEvents.MEMBER_JOIN:
+            pass
+        if action == FlowConnectorEvents.MEMBER_UPDATE:
+            pass
+
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):
         """
@@ -255,4 +275,4 @@ class APIInterface(BaseInterface):
         self.messages.get().append(data)
 
     async def stop_process(self, *args, **kwargs):
-        return self.messages.get()
+        pass
