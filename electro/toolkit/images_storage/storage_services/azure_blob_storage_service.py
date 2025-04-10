@@ -63,11 +63,11 @@ class AzureBlobStorageService(BaseStorageService):
             blob_client = container_client.get_blob_client(object_key)
             try:
                 image_data = await blob_client.download_blob()
-            except ResourceNotFoundError:
-                raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.")
+            except ResourceNotFoundError as e:
+                raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.") from e
             return BytesIO(await image_data.readall())
 
-    async def _create_image_access_token(self, blob_client: BlobClient, account_key: str) -> str:
+    async def _create_image_access_token(self, blob_client: BlobClient) -> str:
         start_time = datetime.datetime.now(datetime.timezone.utc)
         expiry_time = start_time + datetime.timedelta(days=1)
         return generate_blob_sas(
@@ -85,5 +85,5 @@ class AzureBlobStorageService(BaseStorageService):
         async with await self.blob_service_client as client:
             container_client = client.get_container_client(self.container_name)
             blob_client = container_client.get_blob_client(object_key)
-            token = await self._create_image_access_token(blob_client, settings.AZURE_CLIENT_SECRET)
+            token = await self._create_image_access_token(blob_client)
             return f"{blob_client.url}?{token}"

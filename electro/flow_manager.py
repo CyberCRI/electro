@@ -89,7 +89,7 @@ class AnalyticsManager(ContextInstanceMixin):
                 user.dm_channel = channel
                 await user.save()
                 return channel
-            elif created:
+            if created:
                 platform_id.channel = user.dm_channel
                 await platform_id.save()
                 await channel.delete()
@@ -280,13 +280,13 @@ class FlowManager(ContextInstanceMixin):
                         f"The message is a command that is not handled by any of the flows: "
                         f"{flow_connector.message.content}"
                     )
-                else:
-                    logger.warning(
-                        f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
-                    )
-                    raise EventCannotBeProcessed(
-                        f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
-                    )
+
+                logger.warning(
+                    f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
+                )
+                raise EventCannotBeProcessed(
+                    f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
+                )
 
             # Get all the flows that can be run:
             # Check if the flow can be run (maybe the user is in the middle of the flow)
@@ -300,7 +300,7 @@ class FlowManager(ContextInstanceMixin):
                 flows_by_scope = defaultdict(list)
                 for flow in flows_that_can_be_run:
                     # noinspection PyProtectedMember
-                    flows_by_scope[flow._scope].append(flow)
+                    flows_by_scope[flow._scope].append(flow)  # pylint: disable=W0212
 
                 # If it's not a private channel, Channel-scoped flows get the priority
                 if flow_connector.channel.type == Channel.ChannelTypes.CHANNEL and (
@@ -322,17 +322,16 @@ class FlowManager(ContextInstanceMixin):
                 if scope == FlowScopes.USER:
                     if flow_connector.event == FlowConnectorEvents.MESSAGE:
                         return await self._finish_flow(flow_connector)
-
                     logger.warning(f"Received an event that cannot be processed: {flow_connector.event}")
                     raise EventCannotBeProcessed(f"Received an event that cannot be processed: {flow_connector.event}")
-                else:
-                    logger.debug(
-                        "Out-of-scope `{scope}` event cannot be processed: "
-                        "`{flow_connector.event}` in `#{flow_connector.channel}`",
-                        scope=scope,
-                        flow_connector=flow_connector,
-                    )
-                    return  # Do not raise an exception, as it's not an error
+
+                logger.debug(
+                    "Out-of-scope `{scope}` event cannot be processed: "
+                    "`{flow_connector.event}` in `#{flow_connector.channel}`",
+                    scope=scope,
+                    flow_connector=flow_connector,
+                )
+                return  # Do not raise an exception, as it's not an error
 
     async def dispatch(self, flow_connector: FlowConnector):
         """Dispatch the flow."""

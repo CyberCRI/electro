@@ -18,7 +18,6 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
         tortoise_model_field_name: str,
         filters: dict[str, Any] | None = None,
         ensure_list_result: bool = False,
-        *args,
         **kwargs,
     ):
         """Initialize the substitution."""
@@ -27,14 +26,13 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
         self.filters = filters or {}
         self.ensure_list_result = ensure_list_result
 
-        super().__init__(callback=self.get_value_for_connector, *args, **kwargs)
+        super().__init__(callback=self.get_value_for_connector, **kwargs)
 
     @staticmethod
     async def resolve_filters(flow_connector: FlowConnector, filters: dict[str, Any]) -> dict[str, Any]:
-        # noinspection PyProtectedMember
         return {
             key: (
-                await value.get_data(default=value._type())
+                await value.get_data(default=value._type())  # pylint: disable=W0212
                 if isinstance(value, BaseStorageBucketElement)
                 else await value.resolve(flow_connector) if isinstance(value, BaseSubstitution) else value
             )

@@ -103,7 +103,7 @@ class S3Service(BaseStorageService):
         :return: URL of the image
 
         """
-        async with self.session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL) as s3:
+        async with self.session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL):
             try:
                 url = f"{settings.S3_ENDPOINT_URL}/{self.bucket_name}/{object_key}"
                 logger.info(f"Image URL: {url}")

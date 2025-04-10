@@ -19,19 +19,13 @@ DEFAULT_MISSING_ADDRESS_PART = "missing"
 class BaseData(dict):
     """The base class for the data."""
 
-    pass
-
 
 class UserData(BaseData):
     """The data for a user."""
 
-    pass
-
 
 class ChannelData(BaseData):
     """The data for a channel."""
-
-    pass
 
 
 class BaseFlowStorage(ABC):

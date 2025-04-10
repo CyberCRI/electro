@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
 
-from .enums import ResponseTypes
+from .enums import ResponseTypes, SupportedPlatforms
 from .flow_connector import FlowConnectorEvents
 from .flow_manager import global_flow_manager
 from .models import BotMessage, Button, Channel, File, Guild, Role, User
@@ -21,15 +21,18 @@ if TYPE_CHECKING:
 
 class BaseInterface(ABC):
     """
-    Interface class for the Electro framework.
+    Interface class for the Electro framework. This class is used to receive messages and events from the client and
+    send back tasks to be executed.
+
+    To use it, you need to inherit from this class and implement the `send_json` method. This method is called
+    whenever a task is sent to the client. You can also override the `handle_incoming_action` method to handle
+    more incoming actions from the client.
     """
 
     async def _create_and_format_buttons(
         self, buttons: Optional[List["BaseButton"]] = None, bot_message: Optional[BotMessage] = None
     ) -> List[Button]:
-        """
-        Format the buttons to be sent to the client.
-        """
+        """Format the buttons to be sent to the client."""
         response = []
         for button in buttons or []:
             button_object = await Button.create(
@@ -53,9 +56,7 @@ class BaseInterface(ABC):
         return response
 
     async def _format_user(self, user: Optional[User]) -> Dict[str, Any]:
-        """
-        Format the user to be sent to the client.
-        """
+        """Format the user to be sent to the client."""
         if not user:
             return None
         return {
@@ -67,9 +68,7 @@ class BaseInterface(ABC):
         }
 
     async def _format_channel(self, channel: Optional[Channel]) -> Dict[str, Any]:
-        """
-        Format the channel to be sent to the client.
-        """
+        """Format the channel to be sent to the client."""
         if not channel:
             return None
         return {
@@ -82,9 +81,7 @@ class BaseInterface(ABC):
         }
 
     async def _format_guild(self, guild: Optional[Guild]) -> Dict[str, Any]:
-        """
-        Format the guild to be sent to the client.
-        """
+        """Format the guild to be sent to the client."""
         if not guild:
             return None
         return {
@@ -104,7 +101,17 @@ class BaseInterface(ABC):
         delete_after: Optional[Union[int, str]] = None,
     ):
         """
-        Send a formatted message to the client by using `format_message`.
+        Send a formatted message to the client.
+
+        Arguments:
+            message: The message to be sent.
+            user: The user who will receive the message.
+            channel: The channel the message is being sent to.
+            buttons: A list of buttons to be included with the message.
+            delete_after: The time in seconds after which the message should be deleted.
+                - if None, the message will not be deleted.
+                - if "next", the message will be deleted after the next message is sent.
+                - if an integer, the message will be deleted after that many seconds.
         """
         bot_message = await BotMessage.create(receiver=user, channel=channel, content=message)
         data = {
@@ -131,7 +138,24 @@ class BaseInterface(ABC):
         delete_after: Optional[int] = None,
     ):
         """
-        Send images to the client.
+        Send images to the client as a link:
+
+        If the image is a File, the link to the blob storage location will be sent.
+        If the image is a BytesIO object, it will be uploaded to blob storage and the link will be sent.
+        If the image is a string, it will be sent as is so make sure it is a valid URL.
+        If the image is a pathlib.Path object, it will be sent as a link to the static file endpoint.
+
+        Arguments:
+            image: The image to be sent.
+            user: The user who will receive the image.
+            channel: The channel the image is being sent to.
+            caption: The caption to be included with the image.
+            buttons: A list of buttons to be included with the image.
+            delete_after: The time in seconds after which the image should be deleted.
+                - if None, the image will not be deleted.
+                - if "next", the image will be deleted after the next message is sent.
+                - if an integer, the image will be deleted after that many seconds.
+
         """
         if buttons and not caption:
             raise ValueError("A caption must be provided when sending an image with buttons.")
@@ -168,6 +192,13 @@ class BaseInterface(ABC):
         )
 
     async def add_role(self, user: User, role: Role):
+        """
+        Assign a role to a user.
+
+        Arguments:
+            user: The user to whom the role will be assigned.
+            role: The role to be assigned to the user.
+        """
         await self.send_json(
             {
                 "action": ResponseTypes.ADD_ROLE,
@@ -180,6 +211,13 @@ class BaseInterface(ABC):
         )
 
     async def remove_role(self, user: User, role: Role):
+        """
+        Remove a role from a user.
+
+        Arguments:
+            user: The user from whom the role will be removed.
+            role: The role to be removed from the user.
+        """
         await self.send_json(
             {
                 "action": ResponseTypes.REMOVE_ROLE,
@@ -192,6 +230,14 @@ class BaseInterface(ABC):
         )
 
     async def set_typing(self, user: User, channel: Channel, action: ResponseTypes):
+        """
+        Set the typing indicator for a user or a channel.
+
+        Arguments:
+            user: The user for whom the typing indicator will be set.
+            channel: The channel in which the typing indicator will be set.
+            action: The action to be performed (either "start_typing" or "stop_typing").
+        """
         if action not in [ResponseTypes.START_TYPING, ResponseTypes.STOP_TYPING]:
             raise ValueError("Action must be either `START_TYPING` or `STOP_TYPING`.")
         await self.send_json(
@@ -204,6 +250,19 @@ class BaseInterface(ABC):
             }
         )
 
+    async def stop_process(self):
+        """
+        Stop the process for the client.
+
+        This is used to stop the process for the client and close the connection.
+        """
+        await self.send_json(
+            {
+                "action": ResponseTypes.STOP_PROCESS,
+                "content": {},
+            }
+        )
+
     @asynccontextmanager
     async def with_constant_typing(self, user: User, channel: Channel):
         """An asynchronous context manager for typing indicators or other tasks."""
@@ -211,9 +270,15 @@ class BaseInterface(ABC):
         yield
         await self.set_typing(user, channel, ResponseTypes.STOP_TYPING)
 
-    async def handle_incoming_action(self, platform: str, data: Dict[str, Any]) -> Tuple[Dict[str, str], int]:
+    async def handle_incoming_action(
+        self, platform: SupportedPlatforms, data: Dict[str, Any]
+    ) -> Tuple[Dict[str, str], int]:
         """
-        Handle incoming actions from the client.
+        Handle incoming actions from the client. The action data is validated and processed.
+
+        Arguments:
+            platform: The platform from which the action was received ().
+            data: The data received from the client.
         """
         action = data.get("action")
         content = data.get("content")
@@ -230,23 +295,12 @@ class BaseInterface(ABC):
 
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):
-        """
-        Send an action for the client.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def stop_process(self, *args, **kwargs):
+        """Send an task for the client to process."""
         raise NotImplementedError
 
 
 class WebSocketInterface(BaseInterface):
-    """
-    WebSocket Interface for the Electro framework.
-
-    On the server side, the WebSocketInterface is used to send messages to the client,
-    If you want to send a message to the client in a Flow, you can use the `send_message` method.
-    """
+    """WebSocket Interface for the Electro framework."""
 
     def __init__(self):
         self.interface: WebSocket | None = None
@@ -260,6 +314,7 @@ class WebSocketInterface(BaseInterface):
         self.interface = None
 
     async def stop_process(self, code: int = 1000, reason: Optional[str] = None):
+        await super().stop_process()
         await self.interface.close(code, reason)
 
     async def send_json(self, data: Dict[str, Any]):
@@ -267,12 +322,11 @@ class WebSocketInterface(BaseInterface):
 
 
 class APIInterface(BaseInterface):
+    """API Interface for the Electro framework."""
+
     def __init__(self):
         self.messages = contextvars.ContextVar("messages")
         self.messages.set([])
 
     async def send_json(self, data: Dict[str, str]):
         self.messages.get().append(data)
-
-    async def stop_process(self, *args, **kwargs):
-        pass

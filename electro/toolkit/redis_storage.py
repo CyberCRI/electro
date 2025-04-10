@@ -13,10 +13,10 @@ from redis.asyncio.client import Redis
 
 from ..settings import settings
 
-if not (redis_url := settings.REDIS_URL):
-    redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
+if not (REDIS_URL := settings.REDIS_URL):
+    REDIS_URL = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
 
-redis_config: dict = dj_redis_url.config(default=str(redis_url))
+redis_config: dict = dj_redis_url.config(default=str(REDIS_URL))
 
 STATE_KEY = "state"
 STATE_DATA_KEY = "data"
@@ -130,7 +130,7 @@ class BaseStorage:
         *,
         chat: typing.Union[str, int, None] = None,
         user: typing.Union[str, int, None] = None,
-        state: typing.Optional[typing.AnyStr] = None,
+        state: typing.Union[str, bytes, None] = None,
     ):
         """
         Set new state for user in chat
@@ -333,12 +333,8 @@ class BaseStorage:
 
     @staticmethod
     def resolve_state(value):
-        if value is None:
-            return
-
-        if isinstance(value, str):
+        if value is None or isinstance(value, str):
             return value
-
         return str(value)
 
 
@@ -387,7 +383,7 @@ class RedisStorage(BaseStorage):
             decode_responses=True,
             **kwargs,
         )
-
+        self._loop = loop
         self._prefix = (prefix,)
         self._state_ttl = state_ttl
         self._data_ttl = data_ttl
@@ -432,7 +428,7 @@ class RedisStorage(BaseStorage):
         *,
         chat: typing.Union[str, int, None] = None,
         user: typing.Union[str, int, None] = None,
-        state: typing.Optional[typing.AnyStr] = None,
+        state: typing.Union[str, bytes, None] = None,
     ):
         chat, user = self.check_address(chat=chat, user=user)
         key = self.generate_key(chat, user, STATE_KEY)
@@ -544,10 +540,9 @@ class RedisStorage(BaseStorage):
 
 
 # According to the structure above, it's better to write this expression
+# https://devcenter.heroku.com/articles/ah-redis-stackhero#how-to-avoid-error-connection-closed-by-server-with-redis-and-python
 redis_storage = RedisStorage(
     **parse_config(redis_config),
-    # Configs below are from here:
-    #  https://devcenter.heroku.com/articles/ah-redis-stackhero#:~:text=The%20error%20%E2%80%9Credis.,and%20the%20connection%20closes%20automatically.
     health_check_interval=10,
     socket_connect_timeout=5,
     retry_on_timeout=True,

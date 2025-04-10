@@ -24,8 +24,6 @@ STATE_SEPARATOR = ":"
 class FlowFinished(Exception):
     """The exception that is raised when the `Flow` is finished."""
 
-    pass
-
 
 class FlowMeta(ABCMeta):
     def __new__(mcs: typing.Type[FlowMeta], name, bases, namespace, **kwargs):
@@ -210,7 +208,7 @@ class Flow(BaseFlow):
 
     async def check_triggers(self, connector: FlowConnector, scope: FlowScopes | None = None) -> bool:
         """Check if the `Flow` can be triggered."""
-        return any([await trigger.check(connector, scope=scope) for trigger in self._triggers])
+        return any(await trigger.check(connector, scope=scope) for trigger in self._triggers)
 
     async def _update_connector_pre_run(self, connector: FlowConnector, *_, **__kwargs) -> FlowConnector | None:
         """Update the connector before running the `Flow`."""
@@ -334,7 +332,7 @@ class Flow(BaseFlow):
                     )
                 next_step_name, next_step = list(self._steps.items())[next_step_index]
                 logger.info(f"Next step name: {next_step_name} [{connector.user.id=}]")
-            except (IndexError, StopIteration):
+            except (IndexError, StopIteration) as e:
                 if (
                     (iterables := await self.get_iterables(connector))
                     # and isinstance(
@@ -348,7 +346,7 @@ class Flow(BaseFlow):
                     next_step_name, next_step = list(self._steps.items())[next_step_index]
                     logger.info(f"Next step name: {next_step_name} [{connector.user.id=}]")
                 else:
-                    raise FlowFinished()
+                    raise FlowFinished() from e
 
             # Set the state for the user
             default_state_parts: list[str] = [self._state_prefix, iterator_index, next_step_name]

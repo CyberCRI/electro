@@ -20,3 +20,4 @@ class ResponseTypes(str, Enum):
     REMOVE_ROLE = "remove_role"
     START_TYPING = "start_typing"
     STOP_TYPING = "stop_typing"
+    STOP_PROCESS = "stop_process"

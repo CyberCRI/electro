@@ -40,8 +40,6 @@ class ModelMeta(tortoise_ModelMeta):
 class Model(tortoise_Model, metaclass=ModelMeta):
     """The base `tortoise-orm` `Model`."""
 
-    pass
-
 
 def get_tortoise_config():
     """Get the configuration for the `tortoise-orm`."""

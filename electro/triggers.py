@@ -19,7 +19,7 @@ class BaseFlowTrigger(ABC):
 
     allowed_scopes: list[FlowScopes] = [FlowScopes.USER]
 
-    # noinspection PyUnusedLocal
+    # pylint: disable=W0613
     async def check_scope(self, connector: FlowConnector, scope: FlowScopes | None = None) -> bool:
         """Check if the `Flow` can be run based on the scope."""
         if scope and scope not in self.allowed_scopes:

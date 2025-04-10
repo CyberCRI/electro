@@ -9,12 +9,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from urllib.parse import urlparse
 
 from openai import AsyncOpenAI, NOT_GIVEN
 
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
-from .enums import ResponseTypes
 from .flow_connector import FlowConnectorEvents
 from .models import Channel, File
 from .settings import settings
@@ -31,8 +29,6 @@ if typing.TYPE_CHECKING:
 
 class FlowStepDone(Exception):
     """The exception that is raised when the `BaseFlowStep` is finished."""
-
-    pass
 
 
 class BaseFlowStep(ABC):
@@ -103,19 +99,19 @@ class StorageMixin(ABC):
 
     async def _get_user_answer(self) -> typing.Any:
         """Get the user answer."""
-        if self.answers_storage:
+        if self.answers_storage is not None:
             async with self.answers_storage as answers_storage:
                 return answers_storage.get()
 
     async def _set_user_answer(self, user_answer: typing.Any):
         """Set the user answer."""
-        if self.answers_storage:
+        if self.answers_storage is not None:
             async with self.answers_storage as answers_storage:
                 answers_storage.set(user_answer)
 
     async def clear_storage(self) -> None:
         """Clear the storage."""
-        if self.answers_storage:
+        if self.answers_storage is not None:
             await self.answers_storage.delete_data()
 
 
@@ -153,13 +149,11 @@ class CallbackHandlerStep(BaseFlowStep):
 
                 # Run the `BaseFlowStep`
                 await result.run(connector)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=W0718
             if self.skip_on_failure:
                 logger.exception(e)
-
                 raise FlowStepDone() from e
-            else:
-                raise e
+            raise e
 
         if self.non_blocking:
             raise FlowStepDone()
@@ -536,7 +530,7 @@ class AcceptFileStep(MessageFlowStep):
                         file_name=attachment.filename,
                     )
 
-                except Exception as exception:
+                except Exception as exception:  # pylint: disable=W0718
                     logger.error(f"Failed to save the file: {exception}")
                     return await self.send_message(connector, "Failed to save the file.")
 

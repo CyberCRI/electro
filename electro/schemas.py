@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-from .enums import SupportedPlatforms
-
 
 class PlatformId(BaseModel):
     id: str

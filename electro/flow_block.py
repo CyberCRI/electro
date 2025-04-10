@@ -10,8 +10,6 @@ from .flow_step import BaseFlowStep
 class FlowBlockFinished(Exception):
     """The exception that is raised when the `FlowBlock` is finished."""
 
-    pass
-
 
 class FlowBlockMeta(ABCMeta):
     pass
@@ -19,8 +17,6 @@ class FlowBlockMeta(ABCMeta):
 
 class BaseFlowBlock(ABC, metaclass=FlowBlockMeta):
     """The base class for `FlowBlock`."""
-
-    pass
 
 
 @dataclass

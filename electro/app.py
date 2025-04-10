@@ -41,7 +41,7 @@ async def process_message(platform: str, data: Dict[str, Any]):
 
 
 @app.websocket("/websocket/platform/{platform}/user/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, platform: str, user_id: str):
+async def websocket_endpoint(websocket: WebSocket, platform: str, user_id: str):  # pylint: disable=W0613
     if platform not in SupportedPlatforms:
         raise ValueError(f"Platform {platform} is not supported.")
     interface = WebSocketInterface()

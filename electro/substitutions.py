@@ -34,11 +34,9 @@ class BaseSubstitution(ABC, typing.Generic[VALUE]):
     async def resolve(self, connector: FlowConnector) -> VALUE:
         """Resolve the value for the connector."""
         value = await self._resolve(connector) or self.default_value
-
         if self.formatter and value is not None:
             return self.formatter(value)
-        else:
-            return str(value) if self.ensure_str_result else value
+        return str(value) if self.ensure_str_result else value
 
 
 class ManualRedisStorageSubstitution(BaseSubstitution):
@@ -50,9 +48,9 @@ class ManualRedisStorageSubstitution(BaseSubstitution):
     is_chat_specific: bool = False
 
     def __init__(
-        self, redis_storage: RedisStorage, redis_storage_key_name: str, is_chat_specific: bool = False, *args, **kwargs
+        self, redis_storage: RedisStorage, redis_storage_key_name: str, is_chat_specific: bool = False, **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.redis_storage = redis_storage
         self.redis_storage_key_name = redis_storage_key_name
@@ -75,17 +73,16 @@ class ManualRedisStorageSubstitution(BaseSubstitution):
             data: VALUE = redis_user_data.get(self.redis_storage_key_name, self.default_value)
         except (TypeError, IndexError) as exception:
             return str(f"{exception} in REDIS STORAGE SUBSTITUTION for key: {self.redis_storage_key_name}")
-        else:
-            return data
+        return data
 
 
 class AttributeSubstitution(BaseSubstitution):
     substitution_object: BaseFlowSubstitutionObject
     attribute: str | None = None
 
-    def __init__(self, substitution_object: BaseFlowSubstitutionObject, attribute: str | None = None, *args, **kwargs):
+    def __init__(self, substitution_object: BaseFlowSubstitutionObject, attribute: str | None = None, **kwargs):
         """The Substitution object that would be fetched from the attribute of the object."""
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.substitution_object = substitution_object
         self.attribute = attribute
@@ -99,8 +96,7 @@ class AttributeSubstitution(BaseSubstitution):
 
         if self.attribute:
             return getattr(real_object, self.attribute)
-        else:
-            return real_object
+        return real_object
 
 
 class CallbackSubstitution(BaseSubstitution[VALUE]):
@@ -150,8 +146,7 @@ class GlobalAbstractChannel(str, Enum):
 async def resolve_channel(abstract_channel: GlobalAbstractChannel, user: User) -> Channel:
     """Resolve the channel by the name."""
     if abstract_channel == GlobalAbstractChannel.DM_CHANNEL:
-        return None
-
+        return await user.dm_channel
     raise ValueError(f"Unknown channel: {abstract_channel}")
 
 

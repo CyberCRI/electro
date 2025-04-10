@@ -27,11 +27,10 @@ class StorageSubstitution(BaseSubstitution):
         self,
         data_factory: typing.Callable[[], typing.Awaitable[VALUE | None]],
         index: int | None = None,
-        *args,
         **kwargs,
     ):
         """Initialize the Storage Substitution."""
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.data_factory = data_factory
         self.index = index
@@ -104,14 +103,14 @@ class BaseStorageBucketElement(Generic[VALUE], ABC):
     """The class for storage elements."""
 
     _type: type[VALUE]
-
     _scope: FlowScopes
+    _storage_data: StorageData[VALUE] | None
 
     def __init__(self, *, _type: type[VALUE], _scope: FlowScopes = FlowScopes.USER, **__):
         """Initialize the storage element. Called by the metaclass."""
-
         self._type = _type
         self._scope = _scope
+        self._storage_data = None
 
     @staticmethod
     async def get_current_user_id() -> int:
@@ -165,28 +164,25 @@ class BaseStorageBucketElement(Generic[VALUE], ABC):
         """Get the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._get_user_data(default=default)
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._get_channel_data(default=default)
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def set_data(self, data: VALUE):
         """Set the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._set_user_data(data)
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._set_channel_data(data)
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def delete_data(self):
         """Delete the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._delete_user_data()
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._delete_channel_data()
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def __aenter__(self) -> VALUE:
         """Get the data for the storage element."""
@@ -484,7 +480,7 @@ class PostgresStorageBucketMeta(StorageBucketMeta):
 class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBucketMeta):
     """The base class for Postgres storage buckets."""
 
-    __abstract = True
+    __abstract = True  # pylint: disable=W0238
 
     _model: tortoise.Model
 
@@ -545,7 +541,7 @@ class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBuck
 class BaseAssistantsStorageBucket(BaseStorageBucket, ABC):
     """Base storage bucket for the `GPTAssistantStep`s."""
 
-    __abstract = True
+    __abstract = True  # pylint: disable=W0238
 
     thread_id: StorageBucketElement[str]
 
@@ -553,7 +549,7 @@ class BaseAssistantsStorageBucket(BaseStorageBucket, ABC):
 class BasePostgresAssistantsStorageBucket(BasePostgresStorageBucket, BaseAssistantsStorageBucket):
     """Base storage bucket for the `GPTAssistantStep`s."""
 
-    __abstract = True
+    __abstract = True  # pylint: disable=W0238
 
 
 # endregion

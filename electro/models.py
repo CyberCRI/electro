@@ -23,7 +23,7 @@ class BaseModel(Model):
     is_deleted = fields.BooleanField(default=False)
     date_deleted = fields.DatetimeField(null=True)
 
-    class Meta:  # pylint: disable=too-few-public-methods
+    class Meta:
         """The metaclass for the base model."""
 
         abstract = True
@@ -36,7 +36,8 @@ class PlatformId(Model):
     """
     This model is used to store the IDs of the users, channels, and guilds on different platforms.
 
-    It is used to link the users, channels, and guilds on different platforms to the same user, channel, or guild in the database.
+    It is used to link the users, channels, and guilds on different platforms to the same user, channel,
+    or guild in the database.
 
     Attributes:
         id (int): The ID of the platform ID.
@@ -246,7 +247,7 @@ class BaseStorageModel(BaseModel):
 
         cls.storage_models.append(cls)
 
-    class Meta:  # pylint: disable=too-few-public-methods
+    class Meta:
         """The metaclass for the model."""
 
         abstract = True
@@ -264,7 +265,7 @@ class BaseImagesStepStorageModel(BaseStorageModel):
 
     load_more_button_custom_id = fields.CharField(max_length=255, null=True)
 
-    class Meta:  # pylint: disable=too-few-public-methods
+    class Meta:
         """The metaclass for the model."""
 
         abstract = True
@@ -275,7 +276,7 @@ class BaseAssistantsStorageModel(BaseStorageModel):
 
     thread_id = fields.CharField(max_length=255, null=True)
 
-    class Meta:  # pylint: disable=too-few-public-methods
+    class Meta:
         """The metaclass for the model."""
 
         abstract = True

@@ -14,17 +14,17 @@ CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseF
 class ButtonStyle(Enum):
     """A class to store the button styles."""
 
-    primary = 1
-    secondary = 2
-    success = 3
-    danger = 4
+    PRIMARY = 1
+    SECONDARY = 2
+    SUCCESS = 3
+    DANGER = 4
 
-    blurple = 1
-    grey = 2
-    gray = 2
-    green = 3
-    red = 4
-    url = 5
+    BLURPLE = 1
+    GREY = 2
+    GRAY = 2
+    GREEN = 3
+    RED = 4
+    URL = 5
 
     def __int__(self):
         return self.value
@@ -36,7 +36,7 @@ class BaseButton(ABC):
     def __init__(
         self,
         label: str | None = None,
-        style: ButtonStyle = ButtonStyle.primary,
+        style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = False,
     ):
@@ -56,7 +56,7 @@ class DataButton(BaseButton):
     def __init__(
         self,
         label: str | None = None,
-        style: ButtonStyle = ButtonStyle.primary,
+        style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = False,
         **kwargs,
@@ -70,9 +70,9 @@ class ActionButton(BaseButton):
 
     action_callback: CALLBACK_TYPE
 
-    def __init__(self, label: str, action_callback: CALLBACK_TYPE = None, *args, **kwargs):
+    def __init__(self, label: str, action_callback: CALLBACK_TYPE = None, **kwargs):
         """Initialize the `ActionButton`."""
-        super().__init__(label=label, *args, **kwargs)
+        super().__init__(label=label, **kwargs)
 
         if isinstance(action_callback, BaseFlowStep):
             if action_callback.non_blocking:
@@ -117,7 +117,7 @@ class ConfirmButton(ActionButton):
     def __init__(
         self,
         label: str | None = None,
-        style: ButtonStyle = ButtonStyle.primary,
+        style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = True,
     ):
