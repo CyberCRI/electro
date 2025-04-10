@@ -208,7 +208,7 @@ class Flow(BaseFlow):
 
     async def check_triggers(self, connector: FlowConnector, scope: FlowScopes | None = None) -> bool:
         """Check if the `Flow` can be triggered."""
-        return any(await trigger.check(connector, scope=scope) for trigger in self._triggers)
+        return any([await trigger.check(connector, scope=scope) for trigger in self._triggers])  # pylint: disable=R1729
 
     async def _update_connector_pre_run(self, connector: FlowConnector, *_, **__kwargs) -> FlowConnector | None:
         """Update the connector before running the `Flow`."""
