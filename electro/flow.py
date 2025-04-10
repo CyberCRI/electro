@@ -233,6 +233,7 @@ class Flow(BaseFlow):
 
         return await self.step(connector, initial=True, upper_level_state=upper_level_state)
 
+    # TODO: This is too complex and should be refactored.  pylint: disable=R0912,R0914,R0915
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @forbid_concurrent_execution()
     @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])

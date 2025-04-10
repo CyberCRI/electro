@@ -247,6 +247,7 @@ class FlowManager(ContextInstanceMixin):
             await callback(flow_connector)
         return
 
+    # TODO: This is too complex and should be refactored.  pylint: disable=R0912
     # TODO: [2024-07-19 by Mykola] Use the decorators
     # @fail_safely
     async def _dispatch(self, flow_connector: FlowConnector):

@@ -30,7 +30,6 @@ fastapi = {extras = ["standard"], version = "^0.115.5"}
 black = "^24.8.0"
 isort = "^5.13.2"
 pylint = "^3.2.6"
-pydocstyle = {extras = ["toml"], version = "^6.3.0"}
 sphinx = "^8.2.0"
 sphinx-rtd-theme = "^3.0.2"
 autodoc-pydantic = "^2.2.0"
@@ -57,9 +56,6 @@ max-line-length = 120  # the maximum length of a line
 disable = ["fixme"]  # ignore TODOs and FIXMEs
 source-roots = ["electro"]  # the source roots for pylint to check
 ignore-patterns = ["tests", "migrations"]  # ignore the tests and migrations folders
-
-[tool.pydocstyle]
-match-dir = "(?!tests|migrations).*"  # exclude the tests and migrations folders
 
 
 [tool.aerich]
