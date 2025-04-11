@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     DEFAULT_LOCALE: str = "en"  # Should mirror the `BOT_LANGUAGE` setting. User in the `make upload-locales` target
 
     # Database settings
-    DATABASE_URL: PostgresDsn | None
+    DATABASE_URL: PostgresDsn | None = None
     # if the `DATABASE_URL` is not set, then use the following credentials:
     POSTGRES_HOST: str | None = None
     POSTGRES_USER: str | None = None
