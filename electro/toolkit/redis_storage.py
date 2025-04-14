@@ -13,10 +13,12 @@ from redis.asyncio.client import Redis
 
 from ..settings import settings
 
-if not (redis_url := settings.REDIS_URL):
+if not settings.REDIS_URL:
     redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
+else:
+    redis_url = str(settings.REDIS_URL)
 
-redis_config: dict = dj_redis_url.config(default=str(redis_url))
+redis_config: dict = dj_redis_url.config(default=redis_url)
 
 STATE_KEY = "state"
 STATE_DATA_KEY = "data"
