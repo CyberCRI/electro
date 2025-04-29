@@ -114,19 +114,24 @@ class BaseInterface(ABC):
                 - if an integer, the message will be deleted after that many seconds.
         """
         bot_message = await BotMessage.create(receiver=user, channel=channel, content=message)
-        data = {
-            "user": await self._format_user(user),
-            "channel": await self._format_channel(channel),
-            "message": bot_message.content,
-            "buttons": await self._create_and_format_buttons(buttons, bot_message),
-            "delete_after": delete_after,
-        }
-        await self.send_json(
-            {
-                "action": ResponseTypes.MESSAGE,
-                "content": data,
+        message_chunks = message.split(settings.MESSAGE_BREAK)
+        user = await self._format_user(user)
+        channel = await self._format_channel(channel)
+        buttons = await self._create_and_format_buttons(buttons, bot_message)
+        for i, message_chunk in enumerate(message_chunks):
+            data = {
+                "user": user,
+                "channel": channel,
+                "message": message_chunk,
+                "buttons": buttons if i == len(message_chunks) - 1 else [],
+                "delete_after": delete_after,
             }
-        )
+            await self.send_json(
+                {
+                    "action": ResponseTypes.MESSAGE,
+                    "content": data,
+                }
+            )
 
     async def send_image(
         self,
