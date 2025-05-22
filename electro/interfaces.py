@@ -10,7 +10,7 @@ from fastapi import WebSocket
 from .enums import ResponseTypes, SupportedPlatforms
 from .flow_connector import FlowConnectorEvents
 from .flow_manager import global_flow_manager
-from .models import BotMessage, Button, Channel, File, Guild, Role, User
+from .models import Button, Channel, File, Guild, Message, Role, User
 from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
@@ -30,13 +30,13 @@ class BaseInterface(ABC):
     """
 
     async def _create_and_format_buttons(
-        self, buttons: Optional[List["BaseButton"]] = None, bot_message: Optional[BotMessage] = None
+        self, buttons: Optional[List["BaseButton"]] = None, message: Optional[Message] = None
     ) -> List[Button]:
         """Format the buttons to be sent to the client."""
         response = []
         for button in buttons or []:
             button_object = await Button.create(
-                bot_message=bot_message,
+                message=message,
                 custom_id=button.custom_id,
                 style=button.style,
                 label=button.label,
@@ -113,17 +113,27 @@ class BaseInterface(ABC):
                 - if "next", the message will be deleted after the next message is sent.
                 - if an integer, the message will be deleted after that many seconds.
         """
-        bot_message = await BotMessage.create(receiver=user, channel=channel, content=message)
         message_chunks = message.split(settings.MESSAGE_BREAK)
-        user = await self._format_user(user)
-        channel = await self._format_channel(channel)
-        buttons = await self._create_and_format_buttons(buttons, bot_message)
+        user_data = await self._format_user(user)
+        channel_data = await self._format_channel(channel)
         for i, message_chunk in enumerate(message_chunks):
+            message = await Message.create(
+                is_temporary=delete_after is not None,
+                is_bot_message=True,
+                type=Message.MessageTypes.TEXT,
+                user=user,
+                channel=channel,
+                content=message_chunk,
+            )
+            if i == len(message_chunks) - 1:
+                buttons = await self._create_and_format_buttons(buttons, message)
+            else:
+                buttons = []
             data = {
-                "user": user,
-                "channel": channel,
+                "user": user_data,
+                "channel": channel_data,
                 "message": message_chunk,
-                "buttons": buttons if i == len(message_chunks) - 1 else [],
+                "buttons": buttons,
                 "delete_after": delete_after,
             }
             await self.send_json(
@@ -168,7 +178,7 @@ class BaseInterface(ABC):
             image_url = await universal_image_storage.get_image_url(image.storage_file_object_key)
         elif isinstance(image, BytesIO):
             object_key = await universal_image_storage.upload_image(image)
-            await File.create(
+            image = await File.create(
                 owner=user,
                 storage_service=settings.STORAGE_SERVICE_ID,
                 storage_file_object_key=object_key,
@@ -181,6 +191,17 @@ class BaseInterface(ABC):
         if str(image_url).endswith(".gif") and (buttons or caption):
             raise ValueError("GIFs do not support buttons or captions.")
 
+        message = await Message.create(
+            is_temporary=delete_after is not None,
+            is_bot_message=True,
+            type=Message.MessageTypes.IMAGE,
+            user=user,
+            channel=channel,
+            content=image_url,
+            caption=caption,
+        )
+        if isinstance(image, File):
+            await message.files.add(image)
         data = {
             "user": await self._format_user(user),
             "channel": await self._format_channel(channel),

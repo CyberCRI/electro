@@ -105,10 +105,11 @@ class AnalyticsManager(ContextInstanceMixin):
         else:
             channel = None
         return await Message.create(
-            content=message_data.content,
-            author=author,
-            channel=channel,
             is_command=message_data.content.startswith(settings.BOT_COMMAND_PREFIX),
+            is_bot_message=False,
+            user=author,
+            content=message_data.content,
+            channel=channel,
         )
 
     @classmethod
@@ -347,7 +348,7 @@ class FlowManager(ContextInstanceMixin):
 
         # Save the message to the database
         message = await self.analytics_manager.save_message(platform, message_data)
-        user = await message.author
+        user = await message.user
         channel = await message.channel
 
         # Get the user state and data

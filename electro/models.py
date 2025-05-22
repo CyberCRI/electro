@@ -141,7 +141,6 @@ class Channel(BaseModel):
 
     platform_ids: fields.ReverseRelation[PlatformId]
     messages: fields.ReverseRelation[Message]
-    bot_messages: fields.ReverseRelation[BotMessage]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -165,33 +164,29 @@ class Role(BaseModel):
 class Message(BaseModel):
     """The model for Message."""
 
+    class MessageTypes(str, Enum):
+        """The types of messages."""
+
+        TEXT = "text"
+        IMAGE = "image"
+
     id = fields.BigIntField(pk=True)
-    author: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="messages")
+
+    is_bot_message = fields.BooleanField(default=False)
+    is_command = fields.BooleanField(default=False)
+    is_temporary = fields.BooleanField(default=False)
+    type = fields.CharEnumField(MessageTypes, max_length=255, default=MessageTypes.TEXT)
+
+    user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="messages", null=True)
     channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="messages", null=True)
-    content = fields.TextField()
-    is_command = fields.BooleanField(null=True)
-
-    def __str__(self) -> str:
-        """Return the string representation of the model."""
-        return f"`{self.author}` Message: `{self.content}`."
-
-
-class BotMessage(BaseModel):
-    """The model for Bot Message."""
-
-    id = fields.BigIntField(pk=True)
-    receiver: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="bot_messages", null=True)
-    channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField(
-        "electro.Channel", related_name="bot_messages", null=True
-    )
     content = fields.TextField(null=True)
-
-    files: fields.ManyToManyRelation[File] = ManyToManyField("electro.File", related_name="bot_messages")
+    caption = fields.TextField(null=True)
+    files: fields.ManyToManyRelation[File] = ManyToManyField("electro.File", related_name="messages")
     buttons: fields.ReverseRelation[Button]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"`{self.receiver}` Bot Message: `{self.content}`."
+        return f"Message `{self.id}`."
 
 
 class Button(BaseModel):
@@ -204,9 +199,7 @@ class Button(BaseModel):
     clicked = fields.BooleanField(default=False)
     remove_after_click = fields.BooleanField(default=False)
     extra_data = fields.JSONField(null=True)
-    bot_message: ForeignKeyRelation[BotMessage] = fields.ForeignKeyField(
-        "electro.BotMessage", related_name="buttons", null=True
-    )
+    message: ForeignKeyRelation[Message] = fields.ForeignKeyField("electro.Message", related_name="buttons", null=True)
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
