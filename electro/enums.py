@@ -14,6 +14,7 @@ class SupportedPlatforms(str, Enum):
 class ResponseTypes(str, Enum):
     """The actions that can be processed by the clients."""
 
+    ERROR = "error"
     MESSAGE = "message"
     IMAGE = "image"
     ADD_ROLE = "add_role"

@@ -24,11 +24,16 @@ class Settings(BaseSettings):
     DEFAULT_SLEEP_TIME: int = 3  # seconds
     SLEEP_TIME_PER_CHARACTER: float = 0.05
     HTTPX_CLIENT_DEFAULT_TIMEOUT: int = 60
-    API_KEY_HEADER_NAME: str = "x-api-key"
-    API_KEY: str = "server-token"
     # Build urls for static files by removing root path and adding the server url
     SERVER_URL: str = "http://localhost:8000"
     APP_ROOT: str = "/app"
+
+    # JWT settings
+    AUTHENTICATION_ENABLED: bool = True
+    JWT_TOKEN_TYPE: str = "Bearer"
+    JWT_KEY: str = ""
+    JWT_ID_KEY: str = "sub"
+    JWT_USERNAME_KEY: str = "username"
 
     # Bot settings
     MESSAGE_BREAK: str = "--- message break ---"

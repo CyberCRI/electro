@@ -2,39 +2,63 @@
 
 from typing import Any, Dict, Optional
 
-# from fastapi import Depends
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
-from .enums import SupportedPlatforms
+from .authentication import http_authenticate_user, ws_authenticate_user
 from .interfaces import APIInterface, WebSocketInterface
-from .models import Channel, Message, User
+from .models import Message, PlatformId, User
 from .settings import settings
 from .toolkit.tortoise_orm import get_tortoise_config
 from .utils import format_historical_message
-
-
-def validate_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
-    """Validate the API key provided in the request header."""
-    if not x_api_key and settings.API_KEY:
-        raise HTTPException(status_code=401, detail="API Key is missing")
-    if settings.API_KEY and x_api_key != settings.API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
-
 
 app = FastAPI(
     title="Electro API",
     description="The API server that works as an endpoint for all the Electro Interfaces.",
     version="0.1.0",
-    # dependencies=[Depends(validate_api_key)],
     # docs_url="/",
     # redoc_url=None,
 )
 
 
+@app.get("/api/platform/{platform}/user/{user_platform_id}")
+async def get_user(platform: str, user_id: str, request_user: Optional[User] = Depends(http_authenticate_user)):
+    """
+    Test the API endpoint.
+    """
+    platform_id = await PlatformId.get_or_none(
+        platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
+    )
+    if not platform_id:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user = await platform_id.user
+    if request_user == user or not settings.AUTHENTICATION_ENABLED:
+        # TODO: create a permission check to allow access to other users
+        user = await User.get_or_none(id=user_id)
+        return {
+            "id": user.id,
+            "username": user.username,
+            "platform_ids": [
+                {
+                    "platform": platform.platform,
+                    "platform_id": platform.platform_id,
+                    "type": platform.type,
+                }
+                for platform in await user.platform_ids.all()
+            ],
+        }
+    raise HTTPException(status_code=403, detail="You are not authorized to access this user's information.")
+
+
 @app.get("/api/platform/{platform}/user/{user_id}/messages")
-async def get_user_messages(user_id: str, limit: int = 20, offset: int = 0):
+async def get_user_messages(
+    platform: str,
+    user_id: str,
+    request_user: Optional[User] = Depends(http_authenticate_user),
+    limit: int = 20,
+    offset: int = 0,
+):
     """
     Get the message history for a user.
 
@@ -43,68 +67,73 @@ async def get_user_messages(user_id: str, limit: int = 20, offset: int = 0):
         limit: The maximum number of messages to retrieve.
         offset: The number of messages to skip before retrieving the history.
     """
-    user = await User.get_or_none(id=user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    messages = (
-        await Message.filter(
-            user=user,
-            is_temporary=False,
-        )
-        .order_by("-date_added")
-        .limit(limit)
-        .offset(offset)
+    platform_id = await PlatformId.get_or_none(
+        platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
     )
-    return [await format_historical_message(message) for message in messages]
-
-
-@app.get("/api/channel/{channel_id}/messages")
-async def get_channel_messages(channel_id: str, limit: int = 20, offset: int = 0):
-    """
-    Get the message history for a channel.
-
-    Arguments:
-        channel: The channel whose message history is to be retrieved.
-        limit: The maximum number of messages to retrieve.
-        offset: The number of messages to skip before retrieving the history.
-    """
-    channel = await Channel.get_or_none(id=channel_id)
-    if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
-    messages = (
-        await Message.filter(
-            channel=channel,
-            is_temporary=False,
+    if not platform_id:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user = await platform_id.user
+    if request_user == user or not settings.AUTHENTICATION_ENABLED:
+        user = await User.get_or_none(id=user_id)
+        messages = (
+            await Message.filter(
+                user=user,
+                is_temporary=False,
+            )
+            .order_by("-date_added")
+            .limit(limit)
+            .offset(offset)
         )
-        .order_by("-date_added")
-        .limit(limit)
-        .offset(offset)
-    )
-    return [await format_historical_message(message) for message in messages]
+        return [await format_historical_message(message) for message in messages]
+    raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")
 
 
-@app.post("/api/platform/{platform}")
-async def process_message(platform: str, data: Dict[str, Any]):
+@app.post("/api/platform/{platform}/user/{user_id}/messages")
+async def process_message(
+    platform: str,
+    user_id: str,
+    data: Dict[str, Any],
+    request_user: Optional[User] = Depends(http_authenticate_user),
+):
     """Process the message."""
-    if platform not in SupportedPlatforms:
-        raise ValueError(f"Platform {platform} is not supported.")
-    interface = APIInterface()
-    await interface.handle_incoming_action(platform, data)
-    return interface.messages.get()
+    platform_id = await PlatformId.get_or_none(
+        platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
+    )
+    if not platform_id:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user = await platform_id.user
+    if request_user == user or not settings.AUTHENTICATION_ENABLED:
+        user = await User.get_or_none(id=user_id)
+        interface = APIInterface()
+        await interface.handle_incoming_action(user, platform, data)
+        return interface.messages.get()
+    raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
 @app.websocket("/websocket/platform/{platform}/user/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, platform: str, user_id: str):  # pylint: disable=W0613
-    if platform not in SupportedPlatforms:
-        raise ValueError(f"Platform {platform} is not supported.")
-    interface = WebSocketInterface()
-    await interface.connect(websocket)
-    try:
-        while websocket.application_state == WebSocketState.CONNECTED:
-            data = await websocket.receive_json()
-            await interface.handle_incoming_action(platform, data)
-    except WebSocketDisconnect:
-        await interface.disconnect()
+async def websocket_endpoint(
+    websocket: WebSocket,
+    platform: str,
+    user_id: str,
+    request_user: Optional[User] = Depends(ws_authenticate_user),
+):
+    """Handle the websocket connection."""
+    platform_id = await PlatformId.get_or_none(
+        platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
+    )
+    if not platform_id:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user = await platform_id.user
+    if request_user == user or not settings.AUTHENTICATION_ENABLED:
+        interface = WebSocketInterface()
+        await interface.connect(websocket)
+        try:
+            while websocket.application_state == WebSocketState.CONNECTED:
+                data = await websocket.receive_json()
+                await interface.handle_incoming_action(user, platform, data)
+        except WebSocketDisconnect:
+            await interface.disconnect()
+    raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
 # region Register Tortoise

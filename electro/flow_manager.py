@@ -46,23 +46,6 @@ class AnalyticsManager(ContextInstanceMixin):
         return await platform_id.guild
 
     @classmethod
-    async def get_or_create_user(cls, platform: str, user_data: schemas.User) -> User:
-        """Save the user to the database."""
-        platform_id, created = await PlatformId.get_or_create(
-            platform_id=user_data.platform_id.id, platform=platform, type=PlatformId.PlatformIdTypes.USER
-        )
-        if created:
-            user = await User.create(username=user_data.username)
-            platform_id.user = user
-            logger.info(f"Created the User record for {user.id=}, {user.username=}")
-            await platform_id.save()
-        if user_data.guild:
-            guild = await cls.get_or_create_guild(platform, user_data.guild)
-            user.guild = guild
-            await user.save()
-        return await platform_id.user
-
-    @classmethod
     async def get_or_create_channel(
         cls, platform: str, channel_data: schemas.Channel, user: typing.Optional[User] = None
     ) -> Channel:
@@ -97,9 +80,8 @@ class AnalyticsManager(ContextInstanceMixin):
         return channel
 
     @classmethod
-    async def save_message(cls, platform: str, message_data: schemas.ReceivedMessage) -> Message:
+    async def save_message(cls, author: User, platform: str, message_data: schemas.ReceivedMessage) -> Message:
         """Save the message to the database."""
-        author = await cls.get_or_create_user(platform, message_data.author)
         if message_data.channel:
             channel = await cls.get_or_create_channel(platform, message_data.channel, author)
         else:
@@ -343,12 +325,13 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, platform: str, message_data: schemas.ReceivedMessage, interface: BaseInterface):
+    async def on_message(
+        self, user: User, platform: str, message_data: schemas.ReceivedMessage, interface: BaseInterface
+    ):
         """Handle the messages sent by the users."""
 
         # Save the message to the database
-        message = await self.analytics_manager.save_message(platform, message_data)
-        user = await message.user
+        message = await self.analytics_manager.save_message(user, platform, message_data)
         channel = await message.channel
 
         # Get the user state and data
@@ -379,10 +362,11 @@ class FlowManager(ContextInstanceMixin):
 
         return await self.dispatch(flow_connector)
 
-    async def on_button_click(self, platform: str, button_data: schemas.ButtonClick, interface: BaseInterface):
+    async def on_button_click(
+        self, user: User, platform: str, button_data: schemas.ButtonClick, interface: BaseInterface
+    ):
         """Handle the buttons clicked by the users."""
         # Save the button click to the database
-        user = await self.analytics_manager.get_or_create_user(platform, button_data.user)
         channel = await self.analytics_manager.get_or_create_channel(platform, button_data.channel, user)
         try:
             button = await self.analytics_manager.save_button_click(button_data.id)

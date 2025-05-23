@@ -297,7 +297,7 @@ class BaseInterface(ABC):
         await self.set_typing(user, channel, ResponseTypes.STOP_TYPING)
 
     async def handle_incoming_action(
-        self, platform: SupportedPlatforms, data: Dict[str, Any]
+        self, user: User, platform: SupportedPlatforms, data: Dict[str, Any]
     ) -> Tuple[Dict[str, str], int]:
         """
         Handle incoming actions from the client. The action data is validated and processed.
@@ -306,18 +306,28 @@ class BaseInterface(ABC):
             platform: The platform from which the action was received ().
             data: The data received from the client.
         """
-        action = data.get("action")
-        content = data.get("content")
-        if action == FlowConnectorEvents.MESSAGE:
-            content = ReceivedMessage.model_validate(content)
-            await global_flow_manager.on_message(platform, content, self)
-        if action == FlowConnectorEvents.BUTTON_CLICK:
-            content = ButtonClick.model_validate(content)
-            await global_flow_manager.on_button_click(platform, content, self)
-        if action == FlowConnectorEvents.MEMBER_JOIN:
-            pass
-        if action == FlowConnectorEvents.MEMBER_UPDATE:
-            pass
+        try:
+            action = data.get("action")
+            content = data.get("content")
+            if action == FlowConnectorEvents.MESSAGE:
+                content = ReceivedMessage.model_validate(content)
+                await global_flow_manager.on_message(user, platform, content, self)
+            if action == FlowConnectorEvents.BUTTON_CLICK:
+                content = ButtonClick.model_validate(content)
+                await global_flow_manager.on_button_click(user, platform, content, self)
+            if action == FlowConnectorEvents.MEMBER_JOIN:
+                pass
+            if action == FlowConnectorEvents.MEMBER_UPDATE:
+                pass
+        except Exception as exception:  # pylint: disable=W0718
+            await self.send_json(
+                {
+                    "action": ResponseTypes.ERROR,
+                    "content": {
+                        "error": str(exception),
+                    },
+                }
+            )
 
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):
