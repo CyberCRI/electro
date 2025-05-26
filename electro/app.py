@@ -6,12 +6,11 @@ from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
-from .authentication import http_authenticate_user, ws_authenticate_user
+from .authentication import authenticate_user
 from .interfaces import APIInterface, WebSocketInterface
 from .models import Message, PlatformId, User
-from .settings import settings
 from .toolkit.tortoise_orm import get_tortoise_config
-from .utils import format_historical_message
+from .utils import format_historical_message, paginate_response
 
 app = FastAPI(
     title="Electro API",
@@ -23,7 +22,7 @@ app = FastAPI(
 
 
 @app.get("/api/platform/{platform}/user/{user_platform_id}")
-async def get_user(platform: str, user_id: str, request_user: Optional[User] = Depends(http_authenticate_user)):
+async def get_user(platform: str, user_id: str, request_user: Optional[User] = Depends(authenticate_user)):
     """
     Test the API endpoint.
     """
@@ -33,9 +32,8 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
     if not platform_id:
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
-    if request_user == user or not settings.AUTHENTICATION_ENABLED:
-        # TODO: create a permission check to allow access to other users
-        user = await User.get_or_none(id=user_id)
+    # TODO: create a permission check to allow access to other users
+    if request_user == user:
         return {
             "id": user.id,
             "username": user.username,
@@ -55,7 +53,7 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
 async def get_user_messages(
     platform: str,
     user_id: str,
-    request_user: Optional[User] = Depends(http_authenticate_user),
+    request_user: Optional[User] = Depends(authenticate_user),
     limit: int = 20,
     offset: int = 0,
 ):
@@ -73,18 +71,15 @@ async def get_user_messages(
     if not platform_id:
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
-    if request_user == user or not settings.AUTHENTICATION_ENABLED:
-        user = await User.get_or_none(id=user_id)
-        messages = (
-            await Message.filter(
-                user=user,
-                is_temporary=False,
-            )
-            .order_by("-date_added")
-            .limit(limit)
-            .offset(offset)
+    if request_user == user:
+        messages = Message.filter(user=user, is_temporary=False, is_command=False).order_by("-date_added")
+        return await paginate_response(
+            messages,
+            format_historical_message,
+            limit=limit,
+            offset=offset,
+            url=f"/api/platform/{platform}/user/{user_id}/messages",
         )
-        return [await format_historical_message(message) for message in messages]
     raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")
 
 
@@ -93,7 +88,7 @@ async def process_message(
     platform: str,
     user_id: str,
     data: Dict[str, Any],
-    request_user: Optional[User] = Depends(http_authenticate_user),
+    request_user: Optional[User] = Depends(authenticate_user),
 ):
     """Process the message."""
     platform_id = await PlatformId.get_or_none(
@@ -102,8 +97,7 @@ async def process_message(
     if not platform_id:
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
-    if request_user == user or not settings.AUTHENTICATION_ENABLED:
-        user = await User.get_or_none(id=user_id)
+    if request_user == user:
         interface = APIInterface()
         await interface.handle_incoming_action(user, platform, data)
         return interface.messages.get()
@@ -115,7 +109,7 @@ async def websocket_endpoint(
     websocket: WebSocket,
     platform: str,
     user_id: str,
-    request_user: Optional[User] = Depends(ws_authenticate_user),
+    request_user: Optional[User] = Depends(authenticate_user),
 ):
     """Handle the websocket connection."""
     platform_id = await PlatformId.get_or_none(
@@ -124,7 +118,7 @@ async def websocket_endpoint(
     if not platform_id:
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
-    if request_user == user or not settings.AUTHENTICATION_ENABLED:
+    if request_user == user:
         interface = WebSocketInterface()
         await interface.connect(websocket)
         try:

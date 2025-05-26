@@ -3,6 +3,7 @@
 from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .enums import SupportedPlatforms
 from .toolkit.images_storage.storages_enums import StoragesIDs
 
 
@@ -28,8 +29,13 @@ class Settings(BaseSettings):
     SERVER_URL: str = "http://localhost:8000"
     APP_ROOT: str = "/app"
 
-    # JWT settings
+    # Authentication settings
     AUTHENTICATION_ENABLED: bool = True
+    # Default authentication is API key, this list defines platforms that use JWT authentication :
+    JWT_PLATFORMS: list[str] = [SupportedPlatforms.CUSTOM]
+    # API key authentication
+    API_KEY: str = "your_api_key_here"
+    # JWT authentication
     JWT_TOKEN_TYPE: str = "Bearer"
     JWT_KEY: str = ""
     JWT_ID_KEY: str = "sub"

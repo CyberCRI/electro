@@ -1,4 +1,6 @@
-from typing import Any, Dict
+from typing import Any, Callable, Dict
+
+from tortoise.queryset import QuerySet
 
 from .models import Message
 from .toolkit.images_storage.universal_image_storage import universal_image_storage
@@ -40,3 +42,26 @@ async def format_historical_message(message: Message) -> Dict[str, Any]:
             "buttons": buttons,
         }
     return {}
+
+
+async def paginate_response(data: QuerySet, formatter: Callable, limit: int, offset: int, url: str) -> Dict[str, Any]:
+    """
+    Paginate the response data.
+    """
+    total_count = await data.count()
+    paginated_data = await data.offset(offset).limit(limit).all()
+    formatted_data = [await formatter(message) for message in paginated_data]
+    previous_page = f"{url}?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None
+    next_page = f"{url}?limit={limit}&offset={offset + limit}" if offset + limit < total_count else None
+    total_pages = (total_count + limit - 1) // limit
+    current_page = offset // limit + 1
+    return {
+        "count": total_count,
+        "offset": offset,
+        "limit": limit,
+        "pages": total_pages,
+        "page": current_page,
+        "previous": previous_page,
+        "next": next_page,
+        "data": formatted_data,
+    }
