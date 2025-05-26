@@ -112,7 +112,7 @@ async def get_user_messages(
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
     if request_user == user:
-        messages = Message.filter(user=user, is_temporary=False, is_command=False).order_by("-date_added")
+        messages = Message.filter(user=user, is_temporary=False).order_by("-date_added")
         return await paginate_response(
             messages,
             format_historical_message,
