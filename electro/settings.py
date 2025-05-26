@@ -28,11 +28,9 @@ class Settings(BaseSettings):
     # Build urls for static files by removing root path and adding the server url
     SERVER_URL: str = "http://localhost:8000"
     APP_ROOT: str = "/app"
-
     # Authentication settings
-    AUTHENTICATION_ENABLED: bool = True
-    # Default authentication is API key, this list defines platforms that use JWT authentication :
-    JWT_PLATFORMS: list[str] = [SupportedPlatforms.CUSTOM]
+    # Default authentication is API key, this list defines platforms that use JWT authentication instead :
+    JWT_PLATFORMS: list[SupportedPlatforms] = []
     # API key authentication
     API_KEY: str = "your_api_key_here"
     # JWT authentication

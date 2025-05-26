@@ -21,7 +21,47 @@ app = FastAPI(
 )
 
 
-@app.get("/api/platform/{platform}/user/{user_platform_id}")
+@app.patch("/api/platforms/{platform}/user/{user_id}")
+async def update_user(
+    platform: str,
+    user_id: str,
+    data: Dict[str, Any],
+    request_user: Optional[User] = Depends(authenticate_user),
+):
+    """
+    Update the user information.
+
+    Arguments:
+        platform: The platform where the user is registered.
+        user_id: The ID of the user on the platform.
+        username: Optional username to set for the user.
+    """
+    platform_id = await PlatformId.get_or_none(
+        platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
+    )
+    if not platform_id:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user: User = await platform_id.user
+    if request_user == user:
+        if "username" in data:
+            user.username = data["username"]
+            await user.save()
+        return {
+            "id": user.id,
+            "username": user.username,
+            "platform_ids": [
+                {
+                    "platform": platform.platform,
+                    "platform_id": platform.platform_id,
+                    "type": platform.type,
+                }
+                for platform in await user.platform_ids.all()
+            ],
+        }
+    raise HTTPException(status_code=403, detail="You are not authorized to update this user's information.")
+
+
+@app.get("/api/platform/{platform}/user/{user_id}")
 async def get_user(platform: str, user_id: str, request_user: Optional[User] = Depends(authenticate_user)):
     """
     Test the API endpoint.
@@ -31,7 +71,7 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
     )
     if not platform_id:
         raise HTTPException(status_code=404, detail="User not found.")
-    user = await platform_id.user
+    user: User = await platform_id.user
     # TODO: create a permission check to allow access to other users
     if request_user == user:
         return {
