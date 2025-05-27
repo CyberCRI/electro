@@ -512,7 +512,7 @@ class AcceptFileStep(MessageFlowStep):
         # Save the File
         if self.storage_to_save_file_object_id_to or self.storage_to_save_saved_file_id_to:
             file_io = BytesIO(await attachment.read())
-            file_object_key = await universal_image_storage.upload_image(file_io)
+            file_object_key = await universal_image_storage.upload_file(file_io)
 
             if self.storage_to_save_file_object_id_to:
                 # Save the file object key

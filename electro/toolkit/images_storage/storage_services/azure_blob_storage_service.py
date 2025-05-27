@@ -44,7 +44,7 @@ class AzureBlobStorageService(BaseStorageService):
             except ResourceNotFoundError:
                 await container_client.create_container()
 
-    async def upload_image(self, image_io: BytesIO) -> str:
+    async def upload_file(self, image_io: BytesIO) -> str:
         """Upload an image to the Azure Blob Storage."""
         blob_name = f"image_{os.urandom(8).hex()}.png"
         async with await self.blob_service_client as client:
@@ -56,7 +56,7 @@ class AzureBlobStorageService(BaseStorageService):
             )
         return blob_name
 
-    async def download_image(self, object_key: str) -> BytesIO:
+    async def download_file(self, object_key: str) -> BytesIO:
         """Download an image from the Azure Blob Storage."""
         async with await self.blob_service_client as client:
             container_client = client.get_container_client(self.container_name)
@@ -67,7 +67,7 @@ class AzureBlobStorageService(BaseStorageService):
                 raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.") from e
             return BytesIO(await image_data.readall())
 
-    async def _create_image_access_token(self, blob_client: BlobClient) -> str:
+    async def _create_file_access_token(self, blob_client: BlobClient) -> str:
         start_time = datetime.datetime.now(datetime.timezone.utc)
         expiry_time = start_time + datetime.timedelta(days=1)
         return generate_blob_sas(
@@ -80,10 +80,10 @@ class AzureBlobStorageService(BaseStorageService):
             start=start_time,
         )
 
-    async def get_image_url(self, object_key: str) -> str:
+    async def get_file_url(self, object_key: str) -> str:
         """Get the URL of an image in the Azure Blob Storage."""
         async with await self.blob_service_client as client:
             container_client = client.get_container_client(self.container_name)
             blob_client = container_client.get_blob_client(object_key)
-            token = await self._create_image_access_token(blob_client)
+            token = await self._create_file_access_token(blob_client)
             return f"{blob_client.url}?{token}"

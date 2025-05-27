@@ -8,7 +8,7 @@ class BaseStorageService(ABC):
     """Base class for storage services."""
 
     @abstractmethod
-    async def upload_image(self, image_io: BytesIO) -> str:
+    async def upload_file(self, image_io: BytesIO) -> str:
         """Uploads an image to the storage and returns the object key.
 
         :param image_io: BytesIO object of the image to upload
@@ -18,7 +18,7 @@ class BaseStorageService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_image(self, object_key: str) -> BytesIO:
+    async def download_file(self, object_key: str) -> BytesIO:
         """Downloads an image from the storage and returns a BytesIO object.
 
         :param object_key: object key of the image to download
@@ -28,7 +28,7 @@ class BaseStorageService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_image_url(self, object_key: str) -> str:
+    async def get_file_url(self, object_key: str) -> str:
         """Returns the URL of the image.
 
         :param object_key: object key of the image

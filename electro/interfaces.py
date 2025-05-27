@@ -175,15 +175,15 @@ class BaseInterface(ABC):
         if buttons and not caption:
             raise ValueError("A caption must be provided when sending an image with buttons.")
         if isinstance(image, File):
-            image_url = await universal_image_storage.get_image_url(image.storage_file_object_key)
+            image_url = await universal_image_storage.get_file_url(image.storage_file_object_key)
         elif isinstance(image, BytesIO):
-            object_key = await universal_image_storage.upload_image(image)
+            object_key = await universal_image_storage.upload_file(image)
             image = await File.create(
                 owner=user,
                 storage_service=settings.STORAGE_SERVICE_ID,
                 storage_file_object_key=object_key,
             )
-            image_url = await universal_image_storage.get_image_url(object_key)
+            image_url = await universal_image_storage.get_file_url(object_key)
         else:
             image_url = str(image)
         if image_url.startswith(settings.APP_ROOT):

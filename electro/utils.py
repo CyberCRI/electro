@@ -22,7 +22,7 @@ async def format_historical_message(message: Message) -> Dict[str, Any]:
     if message.type == Message.MessageTypes.IMAGE:
         if len(message.files) > 0:
             image = message.files[0]
-            image_url = await universal_image_storage.get_image_url(image.storage_file_object_key)
+            image_url = await universal_image_storage.get_file_url(image.storage_file_object_key)
         else:
             image_url = message.content
         return {

@@ -17,17 +17,17 @@ class UniversalImageStorage:
         """Initialize the UniversalImageStorage class."""
         self.storage_service = storage_service
 
-    async def upload_image(self, image_io: BytesIO) -> str:
+    async def upload_file(self, image_io: BytesIO) -> str:
         """Upload an image to the storage service."""
-        return await self.storage_service.upload_image(image_io)
+        return await self.storage_service.upload_file(image_io)
 
-    async def download_image(self, object_key: str) -> BytesIO:
+    async def download_file(self, object_key: str) -> BytesIO:
         """Download an image from the storage service."""
-        return await self.storage_service.download_image(object_key)
+        return await self.storage_service.download_file(object_key)
 
-    async def get_image_url(self, object_key: str) -> str:
+    async def get_file_url(self, object_key: str) -> str:
         """Get the URL of the image from the storage service."""
-        return await self.storage_service.get_image_url(object_key)
+        return await self.storage_service.get_file_url(object_key)
 
 
 STORAGES_IDS_TO_SERVICES = {
