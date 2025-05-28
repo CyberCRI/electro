@@ -1,6 +1,5 @@
-import mimetypes
 from io import BytesIO
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
 from PIL import Image
 from tortoise.queryset import QuerySet
@@ -71,9 +70,16 @@ async def paginate_response(data: QuerySet, formatter: Callable, limit: int, off
     }
 
 
-async def create_and_upload_file(file: BytesIO, owner: User) -> File:
-    content_type, _ = mimetypes.guess_type(file.name)
-    width, height = get_image_dimensions(file)
+async def create_and_upload_file(file: BytesIO, owner: User, content_type: str) -> File:
+    if content_type.startswith("image/"):
+        try:
+            file.seek(0)
+            with Image.open(file) as img:
+                width, height = img.width, img.height
+        except Exception:  # pylint: disable=W0718
+            width, height = None, None
+    else:
+        width, height = None, None
     object_key = await universal_file_storage.upload_file(file, content_type=content_type)
     return await File.create(
         owner=owner,
@@ -83,13 +89,3 @@ async def create_and_upload_file(file: BytesIO, owner: User) -> File:
         storage_service=settings.STORAGE_SERVICE_ID,
         storage_file_object_key=object_key,
     )
-
-
-def get_image_dimensions(file: BytesIO) -> tuple[Optional[int], Optional[int]]:
-    """Get image dimensions from a BytesIO object."""
-    try:
-        file.seek(0)
-        with Image.open(file) as img:
-            return img.width, img.height
-    except Exception:  # pylint: disable=W0718
-        return None, None

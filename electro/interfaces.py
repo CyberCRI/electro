@@ -3,7 +3,6 @@ import mimetypes
 import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
@@ -16,7 +15,6 @@ from .models import Button, Channel, File, Guild, Message, Role, User
 from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
-from .utils import create_and_upload_file
 
 if TYPE_CHECKING:
     from .contrib.buttons import BaseButton
@@ -100,7 +98,7 @@ class BaseInterface(ABC):
         message: str = "",
         user: Optional[User] = None,
         channel: Optional[Channel] = None,
-        files: Optional[List[Union[File, BytesIO, str, pathlib.Path]]] = None,
+        files: Optional[List[Union[File, str, pathlib.Path]]] = None,
         buttons: Optional[List["BaseButton"]] = None,
         delete_after: Optional[Union[int, str]] = None,
     ):
@@ -159,7 +157,7 @@ class BaseInterface(ABC):
 
     async def _process_message_file(
         self,
-        file: File | BytesIO | str | pathlib.Path,
+        file: File | str | pathlib.Path,
         message: Message,
     ):
         """
@@ -174,9 +172,6 @@ class BaseInterface(ABC):
             file: The file to be sent.
             message: The message to which the file is attached.
         """
-        if isinstance(file, BytesIO):
-            file = await create_and_upload_file(file, message.user)
-
         if isinstance(file, File) or issubclass(type(file), File):
             file_url = await universal_file_storage.get_file_url(file.storage_file_object_key)
             height = file.height
