@@ -18,7 +18,7 @@ from .models import Channel, File
 from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.decorators import with_constant_typing
-from .toolkit.images_storage.universal_image_storage import universal_image_storage
+from .toolkit.files_storage.universal_file_storage import universal_file_storage
 from .toolkit.loguru_logging import logger
 from .toolkit.templated_i18n import TemplatedString
 
@@ -244,9 +244,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         files = await self._get_files_to_send(connector)
-        for file in files:
-            await connector.interface.send_image(file, connector.user, channel_to_send_to)
-        await connector.interface.send_message(message, connector.user, channel_to_send_to, buttons)
+        await connector.interface.send_message(message, connector.user, channel_to_send_to, files, buttons)
 
     @with_constant_typing()
     async def run(
@@ -355,8 +353,8 @@ class SendImageFlowStep(MessageFlowStep):
             await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
-        await connector.interface.send_image(
-            self.file, connector.user, channel_to_send_to, caption=self.caption, buttons=buttons
+        await connector.interface.send_message(
+            self.caption, connector.user, channel_to_send_to, [self.file], buttons=buttons
         )
 
 
@@ -512,7 +510,8 @@ class AcceptFileStep(MessageFlowStep):
         # Save the File
         if self.storage_to_save_file_object_id_to or self.storage_to_save_saved_file_id_to:
             file_io = BytesIO(await attachment.read())
-            file_object_key = await universal_image_storage.upload_file(file_io)
+            content_type = attachment.content_type
+            file_object_key = await universal_file_storage.upload_file(file_io, content_type)
 
             if self.storage_to_save_file_object_id_to:
                 # Save the file object key

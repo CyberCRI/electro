@@ -7,7 +7,7 @@ from enum import Enum
 from tortoise import fields
 from tortoise.fields import ForeignKeyRelation, ManyToManyField
 
-from .toolkit.images_storage.storages_enums import StoragesIDs
+from .toolkit.files_storage.storages_enums import StoragesIDs
 from .toolkit.tortoise_orm import Model
 
 
@@ -99,6 +99,9 @@ class File(BaseModel):
     """The model for the file."""
 
     owner: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", null=True)
+    content_type = fields.CharField(max_length=255, null=True)
+    height = fields.IntField(null=True)
+    width = fields.IntField(null=True)
     storage_service: StoragesIDs = fields.CharEnumField(StoragesIDs, max_length=32)
     storage_file_object_key = fields.TextField()
     file_name = fields.TextField(null=True)

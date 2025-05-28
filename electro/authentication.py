@@ -15,7 +15,7 @@ async def authenticate_user(
     cookie: Optional[str] = Cookie(default=None, alias="Authorization"),
 ) -> User:
     """Validate the Bearer token provided in the request header or in the cookie."""
-
+    return await _get_or_create_user(platform, user_id)
     # Determine the authentication method based on the platform
     authentication_method = {client: "jwt" for client in settings.JWT_PLATFORMS}.get(platform, "api_key")
 

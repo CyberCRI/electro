@@ -10,7 +10,7 @@ from azure.storage.blob import BlobSasPermissions, ContentSettings, generate_blo
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
 
 from ....settings import settings
-from ...images_storage.storage_services._base_storage_service import BaseStorageService
+from ...files_storage.storage_services._base_storage_service import BaseStorageService
 
 
 class AzureBlobStorageService(BaseStorageService):
@@ -44,28 +44,28 @@ class AzureBlobStorageService(BaseStorageService):
             except ResourceNotFoundError:
                 await container_client.create_container()
 
-    async def upload_file(self, image_io: BytesIO) -> str:
-        """Upload an image to the Azure Blob Storage."""
-        blob_name = f"image_{os.urandom(8).hex()}.png"
+    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
+        """Upload an file to the Azure Blob Storage."""
+        blob_name = f"file_{os.urandom(8).hex()}.png"
         async with await self.blob_service_client as client:
             await self._ensure_container_exists()
             container_client = client.get_container_client(self.container_name)
             blob_client = container_client.get_blob_client(blob_name)
             await blob_client.upload_blob(
-                image_io, blob_type="BlockBlob", content_settings=ContentSettings(content_type="image/png")
+                file_io, blob_type="BlockBlob", content_settings=ContentSettings(content_type=content_type)
             )
         return blob_name
 
     async def download_file(self, object_key: str) -> BytesIO:
-        """Download an image from the Azure Blob Storage."""
+        """Download an file from the Azure Blob Storage."""
         async with await self.blob_service_client as client:
             container_client = client.get_container_client(self.container_name)
             blob_client = container_client.get_blob_client(object_key)
             try:
-                image_data = await blob_client.download_blob()
+                file_data = await blob_client.download_blob()
             except ResourceNotFoundError as e:
-                raise FileNotFoundError(f"Image with key '{object_key}' not found in the Azure Blob Storage.") from e
-            return BytesIO(await image_data.readall())
+                raise FileNotFoundError(f"File with key '{object_key}' not found in the Azure Blob Storage.") from e
+            return BytesIO(await file_data.readall())
 
     async def _create_file_access_token(self, blob_client: BlobClient) -> str:
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -81,7 +81,7 @@ class AzureBlobStorageService(BaseStorageService):
         )
 
     async def get_file_url(self, object_key: str) -> str:
-        """Get the URL of an image in the Azure Blob Storage."""
+        """Get the URL of an file in the Azure Blob Storage."""
         async with await self.blob_service_client as client:
             container_client = client.get_container_client(self.container_name)
             blob_client = container_client.get_blob_client(object_key)

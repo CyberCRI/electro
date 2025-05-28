@@ -1,9 +1,13 @@
-from typing import Any, Callable, Dict
+import mimetypes
+from io import BytesIO
+from typing import Any, Callable, Dict, Optional
 
+from PIL import Image
 from tortoise.queryset import QuerySet
 
-from .models import Message
-from .toolkit.images_storage.universal_image_storage import universal_image_storage
+from .models import File, Message, User
+from .settings import settings
+from .toolkit.files_storage.universal_file_storage import universal_file_storage
 
 
 async def format_historical_message(message: Message) -> Dict[str, Any]:
@@ -22,7 +26,7 @@ async def format_historical_message(message: Message) -> Dict[str, Any]:
     if message.type == Message.MessageTypes.IMAGE:
         if len(message.files) > 0:
             image = message.files[0]
-            image_url = await universal_image_storage.get_file_url(image.storage_file_object_key)
+            image_url = await universal_file_storage.get_file_url(image.storage_file_object_key)
         else:
             image_url = message.content
         return {
@@ -65,3 +69,27 @@ async def paginate_response(data: QuerySet, formatter: Callable, limit: int, off
         "next": next_page,
         "data": formatted_data,
     }
+
+
+async def create_and_upload_file(file: BytesIO, owner: User) -> File:
+    content_type, _ = mimetypes.guess_type(file.name)
+    width, height = get_image_dimensions(file)
+    object_key = await universal_file_storage.upload_file(file, content_type=content_type)
+    return await File.create(
+        owner=owner,
+        content_type=content_type,
+        width=width,
+        height=height,
+        storage_service=settings.STORAGE_SERVICE_ID,
+        storage_file_object_key=object_key,
+    )
+
+
+def get_image_dimensions(file: BytesIO) -> tuple[Optional[int], Optional[int]]:
+    """Get image dimensions from a BytesIO object."""
+    try:
+        file.seek(0)
+        with Image.open(file) as img:
+            return img.width, img.height
+    except Exception:  # pylint: disable=W0718
+        return None, None

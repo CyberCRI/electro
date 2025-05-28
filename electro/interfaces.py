@@ -1,4 +1,5 @@
 import contextvars
+import mimetypes
 import pathlib
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
@@ -6,6 +7,7 @@ from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from fastapi import WebSocket
+from PIL import Image
 
 from .enums import ResponseTypes, SupportedPlatforms
 from .flow_connector import FlowConnectorEvents
@@ -13,7 +15,8 @@ from .flow_manager import global_flow_manager
 from .models import Button, Channel, File, Guild, Message, Role, User
 from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
-from .toolkit.images_storage.universal_image_storage import universal_image_storage
+from .toolkit.files_storage.universal_file_storage import universal_file_storage
+from .utils import create_and_upload_file
 
 if TYPE_CHECKING:
     from .contrib.buttons import BaseButton
@@ -94,9 +97,10 @@ class BaseInterface(ABC):
 
     async def send_message(
         self,
-        message: str,
-        user: Optional[User],
-        channel: Optional[Channel],
+        message: str = "",
+        user: Optional[User] = None,
+        channel: Optional[Channel] = None,
+        files: Optional[List[Union[File, BytesIO, str, pathlib.Path]]] = None,
         buttons: Optional[List["BaseButton"]] = None,
         delete_after: Optional[Union[int, str]] = None,
     ):
@@ -125,14 +129,24 @@ class BaseInterface(ABC):
                 channel=channel,
                 content=message_chunk,
             )
+
+            # Send buttons only with the last message chunk
             if i == len(message_chunks) - 1:
                 buttons = await self._create_and_format_buttons(buttons, message)
             else:
                 buttons = []
+
+            # Send files only with the first message chunk
+            if i == 0:
+                processed_files = [await self._process_message_file(file, message) for file in files or []]
+            else:
+                processed_files = []
+
             data = {
                 "user": user_data,
                 "channel": channel_data,
                 "message": message_chunk,
+                "files": processed_files,
                 "buttons": buttons,
                 "delete_after": delete_after,
             }
@@ -143,79 +157,54 @@ class BaseInterface(ABC):
                 }
             )
 
-    async def send_image(
+    async def _process_message_file(
         self,
-        image: File | BytesIO | str | pathlib.Path,
-        user: Optional[User],
-        channel: Optional[Channel],
-        caption: Optional[str] = None,
-        buttons: Optional[List["BaseButton"]] = None,
-        delete_after: Optional[int] = None,
+        file: File | BytesIO | str | pathlib.Path,
+        message: Message,
     ):
         """
-        Send images to the client as a link:
+        Send files to the client as a link:
 
-        If the image is a File, the link to the blob storage location will be sent.
-        If the image is a BytesIO object, it will be uploaded to blob storage and the link will be sent.
-        If the image is a string, it will be sent as is so make sure it is a valid URL.
-        If the image is a pathlib.Path object, it will be sent as a link to the static file endpoint.
+        If the file is a File, the link to the blob storage location will be sent.
+        If the file is a BytesIO object, it will be uploaded to blob storage and the link will be sent.
+        If the file is a string, it will be sent as is so make sure it is a valid URL.
+        If the file is a pathlib.Path object, it will be sent as a link to the static file endpoint.
 
         Arguments:
-            image: The image to be sent.
-            user: The user who will receive the image.
-            channel: The channel the image is being sent to.
-            caption: The caption to be included with the image.
-            buttons: A list of buttons to be included with the image.
-            delete_after: The time in seconds after which the image should be deleted.
-                - if None, the image will not be deleted.
-                - if "next", the image will be deleted after the next message is sent.
-                - if an integer, the image will be deleted after that many seconds.
-
+            file: The file to be sent.
+            message: The message to which the file is attached.
         """
-        if buttons and not caption:
-            raise ValueError("A caption must be provided when sending an image with buttons.")
-        if isinstance(image, File):
-            image_url = await universal_image_storage.get_file_url(image.storage_file_object_key)
-        elif isinstance(image, BytesIO):
-            object_key = await universal_image_storage.upload_file(image)
-            image = await File.create(
-                owner=user,
-                storage_service=settings.STORAGE_SERVICE_ID,
-                storage_file_object_key=object_key,
-            )
-            image_url = await universal_image_storage.get_file_url(object_key)
-        else:
-            image_url = str(image)
-        if image_url.startswith(settings.APP_ROOT):
-            image_url = settings.SERVER_URL + image_url[len(settings.APP_ROOT) :]
-        if str(image_url).endswith(".gif") and (buttons or caption):
-            raise ValueError("GIFs do not support buttons or captions.")
+        if isinstance(file, BytesIO):
+            file = await create_and_upload_file(file, message.user)
 
-        message = await Message.create(
-            is_temporary=delete_after is not None,
-            is_bot_message=True,
-            type=Message.MessageTypes.IMAGE,
-            user=user,
-            channel=channel,
-            content=image_url,
-            caption=caption,
-        )
-        if isinstance(image, File):
-            await message.files.add(image)
-        data = {
-            "user": await self._format_user(user),
-            "channel": await self._format_channel(channel),
-            "image": image_url,
-            "caption": caption,
-            "buttons": await self._create_and_format_buttons(buttons),
-            "delete_after": delete_after,
+        if isinstance(file, File) or issubclass(type(file), File):
+            file_url = await universal_file_storage.get_file_url(file.storage_file_object_key)
+            height = file.height
+            width = file.width
+            content_type = file.content_type
+        else:
+            file_url = str(file)
+            content_type, _ = mimetypes.guess_type(file_url)
+            try:
+                with Image.open(file) as img:
+                    width, height = img.width, img.height
+            except Exception:  # pylint: disable=W0718
+                width, height = None, None
+
+        if file_url.startswith(settings.APP_ROOT):
+            file_url = settings.SERVER_URL + file_url[len(settings.APP_ROOT) :]
+
+        if isinstance(file, File):
+            await message.files.add(file)
+        return {
+            "type": str(type(file)),
+            "is_file": isinstance(file, File),
+            "is_file_subclass": issubclass(type(file), File),
+            "url": file_url,
+            "height": height,
+            "width": width,
+            "content_type": content_type,
         }
-        await self.send_json(
-            {
-                "action": ResponseTypes.IMAGE,
-                "content": data,
-            }
-        )
 
     async def add_role(self, user: User, role: Role):
         """

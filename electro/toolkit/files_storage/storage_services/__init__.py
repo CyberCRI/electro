@@ -1,4 +1,4 @@
-"""Storage Services Module. Responsible for uploading and downloading images from different storage services."""
+"""Storage Services Module. Responsible for uploading and downloading files from different storage services."""
 
 from ._base_storage_service import BaseStorageService
 from .azure_blob_storage_service import AzureBlobStorageService

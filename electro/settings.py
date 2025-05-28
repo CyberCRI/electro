@@ -4,7 +4,7 @@ from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .enums import SupportedPlatforms
-from .toolkit.images_storage.storages_enums import StoragesIDs
+from .toolkit.files_storage.storages_enums import StoragesIDs
 
 
 class Settings(BaseSettings):

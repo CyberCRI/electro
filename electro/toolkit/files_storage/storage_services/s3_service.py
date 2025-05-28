@@ -1,4 +1,4 @@
-"""The S3Service class is responsible for uploading and downloading images to and from an S3 bucket."""
+"""The S3Service class is responsible for uploading and downloading files to and from an S3 bucket."""
 
 from io import BytesIO
 from uuid import uuid4
@@ -7,12 +7,12 @@ from aioboto3 import Session
 from botocore.exceptions import ClientError
 
 from ....settings import settings
-from ....toolkit.images_storage.storage_services._base_storage_service import BaseStorageService
+from ....toolkit.files_storage.storage_services._base_storage_service import BaseStorageService
 from ....toolkit.loguru_logging import logger
 
 
 class S3Service(BaseStorageService):
-    """The S3Service class is responsible for uploading and downloading images to and from an S3 bucket."""
+    """The S3Service class is responsible for uploading and downloading files to and from an S3 bucket."""
 
     # TODO: [13.06.2024 by Mykola] Allow the bucket_name to be passed as an argument to the __init__ method.
     # def __init__(self, bucket_name: str | None = None):
@@ -46,7 +46,7 @@ class S3Service(BaseStorageService):
         await self.ensure_bucket_exists()
         async with self.session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL) as s3:
             await s3.upload_fileobj(file_io, self.bucket_name, object_key, ExtraArgs=extra_args)
-            logger.info(f"Image uploaded successfully: {object_key}")
+            logger.info(f"File uploaded successfully: {object_key}")
 
     async def _download_file(self, object_key: str, destination: str | BytesIO | None = None) -> str | BytesIO:
         """Download a file from the S3 bucket."""
@@ -59,55 +59,55 @@ class S3Service(BaseStorageService):
                 await s3.download_file(self.bucket_name, object_key, destination)
             elif isinstance(destination, BytesIO):
                 await s3.download_fileobj(self.bucket_name, object_key, destination)
-            logger.info(f"Image downloaded successfully: {object_key}")
+            logger.info(f"File downloaded successfully: {object_key}")
 
             return destination
 
-    async def upload_file(self, image_io: BytesIO) -> str:
-        """Uploads an image to the S3 bucket and returns the object key.
+    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
+        """Uploads an file to the S3 bucket and returns the object key.
 
-        :param image_io: BytesIO object of the image to upload
-        :return: object key of the uploaded image
+        :param file_io: BytesIO object of the file to upload
+        :return: object key of the uploaded file
 
         """
         object_key = str(uuid4())
         try:
             # TODO: [2024-10-05 by Mykola] IT'S NOT ALWAYS JPEG
-            await self._upload_file(image_io, object_key, extra_args={"ContentType": "image/jpeg"})
-            logger.info(f"Image uploaded successfully: {object_key}")
+            await self._upload_file(file_io, object_key, extra_args={"ContentType": content_type})
+            logger.info(f"File uploaded successfully: {object_key}")
             return object_key
         except Exception as e:
-            logger.error(f"Failed to upload image: {e}")
+            logger.error(f"Failed to upload file: {e}")
             raise
 
     async def download_file(self, object_key: str) -> BytesIO:
-        """Downloads an image from the S3 bucket and returns a BytesIO object.
+        """Downloads an file from the S3 bucket and returns a BytesIO object.
 
-        :param object_key: object key of the image to download
-        :return: BytesIO object of the downloaded image
+        :param object_key: object key of the file to download
+        :return: BytesIO object of the downloaded file
 
         """
-        image_io = BytesIO()
+        file_io = BytesIO()
         try:
-            await self._download_file(object_key, image_io)
-            logger.info(f"Image downloaded successfully: {object_key}")
-            return image_io
+            await self._download_file(object_key, file_io)
+            logger.info(f"File downloaded successfully: {object_key}")
+            return file_io
         except Exception as e:
-            logger.error(f"Failed to download image: {e}")
+            logger.error(f"Failed to download file: {e}")
             raise
 
     async def get_file_url(self, object_key: str) -> str:
-        """Returns the URL of the image.
+        """Returns the URL of the file.
 
-        :param object_key: object key of the image
-        :return: URL of the image
+        :param object_key: object key of the file
+        :return: URL of the file
 
         """
         async with self.session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL):
             try:
                 url = f"{settings.S3_ENDPOINT_URL}/{self.bucket_name}/{object_key}"
-                logger.info(f"Image URL: {url}")
+                logger.info(f"File URL: {url}")
                 return url
             except Exception as e:
-                logger.error(f"Failed to get image URL: {e}")
+                logger.error(f"Failed to get file URL: {e}")
                 raise
