@@ -26,3 +26,7 @@ class ButtonClick(BaseModel):
     id: int
     custom_id: str
     channel: Channel | None
+
+
+class CookieToken(BaseModel):
+    token: str | None = None
