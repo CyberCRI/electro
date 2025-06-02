@@ -192,9 +192,6 @@ class BaseInterface(ABC):
         if isinstance(file, File):
             await message.files.add(file)
         return {
-            "type": str(type(file)),
-            "is_file": isinstance(file, File),
-            "is_file_subclass": issubclass(type(file), File),
             "url": file_url,
             "height": height,
             "width": width,
