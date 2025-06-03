@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
+from fastapi import Depends, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
@@ -10,9 +10,9 @@ from tortoise.contrib.fastapi import register_tortoise
 from .authentication import authenticate_user
 from .interfaces import APIInterface, WebSocketInterface
 from .models import Message, PlatformId, User
+from .schemas import CookieToken
 from .toolkit.tortoise_orm import get_tortoise_config
 from .utils import format_historical_message, paginate_response
-from .schemas import CookieToken
 
 app = FastAPI(
     title="Electro API",
@@ -72,8 +72,7 @@ async def update_user(
                 for platform in await user.platform_ids.all()
             ],
         }
-    raise HTTPException(
-        status_code=403, detail="You are not authorized to update this user's information.")
+    raise HTTPException(status_code=403, detail="You are not authorized to update this user's information.")
 
 
 @app.get("/api/platform/{platform}/user/{user_id}")
@@ -101,8 +100,7 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
                 for platform in await user.platform_ids.all()
             ],
         }
-    raise HTTPException(
-        status_code=403, detail="You are not authorized to access this user's information.")
+    raise HTTPException(status_code=403, detail="You are not authorized to access this user's information.")
 
 
 @app.get("/api/platform/{platform}/user/{user_id}/messages")
@@ -128,8 +126,7 @@ async def get_user_messages(
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
     if request_user == user:
-        messages = Message.filter(
-            user=user, is_temporary=False).order_by("-date_added")
+        messages = Message.filter(user=user, is_temporary=False).order_by("-date_added")
         return await paginate_response(
             messages,
             format_historical_message,
@@ -137,8 +134,7 @@ async def get_user_messages(
             offset=offset,
             url=f"/api/platform/{platform}/user/{user_id}/messages",
         )
-    raise HTTPException(
-        status_code=403, detail="You are not authorized to access this user's message history.")
+    raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")
 
 
 @app.post("/api/platform/{platform}/user/{user_id}/messages")
@@ -159,8 +155,7 @@ async def process_message(
         interface = APIInterface()
         await interface.handle_incoming_action(user, platform, data)
         return interface.messages.get()
-    raise HTTPException(
-        status_code=403, detail="You are not authorized to send messages on behalf of this user.")
+    raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
 @app.websocket("/websocket/platform/{platform}/user/{user_id}")
@@ -186,8 +181,7 @@ async def websocket_endpoint(
                 await interface.handle_incoming_action(user, platform, data)
         except WebSocketDisconnect:
             await interface.disconnect()
-    raise HTTPException(
-        status_code=403, detail="You are not authorized to send messages on behalf of this user.")
+    raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
 @app.post("/api/cookies")

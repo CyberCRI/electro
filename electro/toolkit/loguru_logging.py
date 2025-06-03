@@ -5,7 +5,7 @@ import sys
 
 from loguru import logger
 
-from ..settings import settings
+from electro.settings import settings
 
 # Remove the default logger
 try:

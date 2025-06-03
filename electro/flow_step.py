@@ -315,7 +315,7 @@ class SendImageFlowStep(MessageFlowStep):
     """The Step that sends an image."""
 
     file: File | pathlib.Path | BytesIO | str | None = None
-    caption: str | None = None
+    caption: str = ""
 
     language: str | None = None
 

@@ -10,12 +10,11 @@ from ._common import ContextInstanceMixin
 from .exceptions import DisabledButtonClick, EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
-
-# from decorators import fail_safely
 from .models import Button, Channel, Guild, Message, PlatformId, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
+from .toolkit.decorators import fail_safely
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
 
@@ -231,8 +230,7 @@ class FlowManager(ContextInstanceMixin):
         return
 
     # TODO: This is too complex and should be refactored.  pylint: disable=R0912
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @fail_safely
+    @fail_safely
     async def _dispatch(self, flow_connector: FlowConnector):
         """Dispatch the flow."""
 

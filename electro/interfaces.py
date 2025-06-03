@@ -1,6 +1,7 @@
 import contextvars
 import mimetypes
 import pathlib
+import traceback
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
@@ -306,6 +307,7 @@ class BaseInterface(ABC):
                     "action": ResponseTypes.ERROR,
                     "content": {
                         "error": str(exception),
+                        "traceback": traceback.format_exc(),
                     },
                 }
             )
