@@ -123,7 +123,6 @@ class BaseInterface(ABC):
             message = await Message.create(
                 is_temporary=delete_after is not None,
                 is_bot_message=True,
-                type=Message.MessageTypes.TEXT,
                 user=user,
                 channel=channel,
                 content=message_chunk,
@@ -190,14 +189,19 @@ class BaseInterface(ABC):
         if file_url.startswith(settings.APP_ROOT):
             file_url = settings.SERVER_URL + file_url[len(settings.APP_ROOT) :]
 
-        if isinstance(file, File):
-            await message.files.add(file)
-        return {
+        data = {
             "url": file_url,
             "height": height,
             "width": width,
             "content_type": content_type,
         }
+
+        if isinstance(file, File):
+            await message.files.add(file)
+        else:
+            message.static_files = [*message.static_files, data]
+            await message.save()
+        return data
 
     async def add_role(self, user: User, role: Role):
         """

@@ -167,24 +167,18 @@ class Role(BaseModel):
 class Message(BaseModel):
     """The model for Message."""
 
-    class MessageTypes(str, Enum):
-        """The types of messages."""
-
-        TEXT = "text"
-        IMAGE = "image"
-
     id = fields.BigIntField(pk=True)
 
     is_bot_message = fields.BooleanField(default=False)
     is_command = fields.BooleanField(default=False)
     is_temporary = fields.BooleanField(default=False)
-    type = fields.CharEnumField(MessageTypes, max_length=255, default=MessageTypes.TEXT)
 
     user: ForeignKeyRelation[User] = fields.ForeignKeyField("electro.User", related_name="messages", null=True)
     channel: ForeignKeyRelation[Channel] = fields.ForeignKeyField("electro.Channel", related_name="messages", null=True)
     content = fields.TextField(null=True)
     caption = fields.TextField(null=True)
     files: fields.ManyToManyRelation[File] = ManyToManyField("electro.File", related_name="messages")
+    static_files = fields.JSONField(default=list, null=True)
     buttons: fields.ReverseRelation[Button]
 
     def __str__(self) -> str:

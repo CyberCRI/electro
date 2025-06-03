@@ -1,10 +1,11 @@
 from io import BytesIO
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
+from fastapi import HTTPException
 from PIL import Image
 from tortoise.queryset import QuerySet
 
-from .models import File, Message, User
+from .models import BaseModel, File, Message, User
 from .settings import settings
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
 
@@ -22,32 +23,28 @@ async def format_historical_message(message: Message) -> Dict[str, Any]:
         }
         for button in message.buttons
     ]
-    if message.type == Message.MessageTypes.IMAGE:
-        if len(message.files) > 0:
-            image = message.files[0]
-            image_url = await universal_file_storage.get_file_url(image.storage_file_object_key)
-        else:
-            image_url = message.content
-        return {
-            "id": message.id,
-            "type": message.type,
-            "is_bot_message": message.is_bot_message,
-            "image": image_url,
-            "caption": message.caption,
-            "buttons": buttons,
+    files = [
+        {
+            "url": await universal_file_storage.get_file_url(file.storage_file_object_key),
+            "height": file.height,
+            "width": file.width,
+            "content_type": file.content_type,
         }
-    if message.type == Message.MessageTypes.TEXT:
-        return {
-            "id": message.id,
-            "type": message.type,
-            "is_bot_message": message.is_bot_message,
-            "message": message.content,
-            "buttons": buttons,
-        }
-    return {}
+        for file in message.files
+    ]
+    return {
+        "id": message.id,
+        "is_bot_message": message.is_bot_message,
+        "date_added": message.date_added.timestamp(),
+        "message": message.content,
+        "files": files + (message.static_files or []),
+        "buttons": buttons,
+    }
 
 
-async def paginate_response(data: QuerySet, formatter: Callable, limit: int, offset: int, url: str) -> Dict[str, Any]:
+async def limit_offset_paginate_response(
+    data: QuerySet[BaseModel], formatter: Callable, limit: int, offset: int, url: str
+) -> Dict[str, Any]:
     """
     Paginate the response data.
     """
@@ -65,6 +62,36 @@ async def paginate_response(data: QuerySet, formatter: Callable, limit: int, off
         "pages": total_pages,
         "page": current_page,
         "previous": previous_page,
+        "next": next_page,
+        "data": formatted_data,
+    }
+
+
+async def limit_from_id_paginate_response(
+    data: QuerySet[BaseModel], formatter: Callable, limit: int, from_id: Optional[int], url: str
+) -> Dict[str, Any]:
+    """
+    Paginate the response data based on the latest ID.
+    """
+    if from_id is not None:
+        latest_item = await data.get_or_none(id=from_id)
+        if not latest_item:
+            raise HTTPException(status_code=400, detail=f"Item with ID {from_id} not found.")
+        data_from_id = data.filter(date_added__lt=latest_item.date_added)
+    else:
+        data_from_id = data
+    fetched_data_from_id = await data_from_id.limit(limit + 1).all()
+    if len(fetched_data_from_id) == limit + 1:
+        next_from_id = fetched_data_from_id[limit - 1]
+        next_page = f"{url}?limit={limit}&from_id={next_from_id.id}"
+    else:
+        next_page = None
+
+    paginated_data = await data_from_id.limit(limit).all()
+    formatted_data = [await formatter(message) for message in paginated_data]
+    return {
+        "from_id": from_id,
+        "limit": limit,
         "next": next_page,
         "data": formatted_data,
     }

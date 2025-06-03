@@ -12,7 +12,7 @@ from .interfaces import APIInterface, WebSocketInterface
 from .models import Message, PlatformId, User
 from .schemas import CookieToken
 from .toolkit.tortoise_orm import get_tortoise_config
-from .utils import format_historical_message, paginate_response
+from .utils import format_historical_message, limit_from_id_paginate_response
 
 app = FastAPI(
     title="Electro API",
@@ -109,7 +109,7 @@ async def get_user_messages(
     user_id: str,
     request_user: Optional[User] = Depends(authenticate_user),
     limit: int = 20,
-    offset: int = 0,
+    from_id: Optional[int] = None,
 ):
     """
     Get the message history for a user.
@@ -118,6 +118,7 @@ async def get_user_messages(
         user: The user whose message history is to be retrieved.
         limit: The maximum number of messages to retrieve.
         offset: The number of messages to skip before retrieving the history.
+        from_id: If provided, this will override the offset to start from the latest message ID.
     """
     platform_id = await PlatformId.get_or_none(
         platform_id=user_id, platform=platform, type=PlatformId.PlatformIdTypes.USER
@@ -127,11 +128,11 @@ async def get_user_messages(
     user = await platform_id.user
     if request_user == user:
         messages = Message.filter(user=user, is_temporary=False).order_by("-date_added")
-        return await paginate_response(
+        return await limit_from_id_paginate_response(
             messages,
             format_historical_message,
             limit=limit,
-            offset=offset,
+            from_id=from_id,
             url=f"/api/platform/{platform}/user/{user_id}/messages",
         )
     raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")

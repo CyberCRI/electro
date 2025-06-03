@@ -99,7 +99,6 @@ def fail_safely(function: Callable[..., Coroutine]):
                 message = _("fail_safely.global_error_text").safe_substitute(**substitute_dict)
             await Message.create(
                 is_bot_message=True,
-                type=Message.MessageTypes.TEXT,
                 channel=global_errors_channel_obj,
                 content=message,
             )
