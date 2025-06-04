@@ -1,5 +1,6 @@
 """The API server that works as an endpoint for all the Electro Interfaces."""
 
+import asyncio
 from typing import Any, Dict, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
@@ -179,10 +180,11 @@ async def websocket_endpoint(
         try:
             while websocket.application_state == WebSocketState.CONNECTED:
                 data = await websocket.receive_json()
-                await interface.handle_incoming_action(user, platform, data)
+                asyncio.create_task(interface.handle_incoming_action(user, platform, data))
         except WebSocketDisconnect:
-            await interface.disconnect()
-    raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
+            del interface
+    else:
+        raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
 @app.post("/api/cookies")

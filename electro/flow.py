@@ -14,7 +14,7 @@ from .models import Message
 from .scopes import FlowScopes
 from .settings import settings
 from .substitutions import BaseSubstitution
-from .toolkit.decorators import forbid_concurrent_execution, with_constant_typing
+from .toolkit.decorators import with_constant_typing
 from .toolkit.loguru_logging import logger
 from .triggers import BaseFlowTrigger
 
@@ -234,7 +234,6 @@ class Flow(BaseFlow):
         return await self.step(connector, initial=True, upper_level_state=upper_level_state)
 
     # TODO: This is too complex and should be refactored.  pylint: disable=R0912,R0914,R0915
-    @forbid_concurrent_execution()
     @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None

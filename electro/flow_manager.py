@@ -14,7 +14,7 @@ from .models import Button, Channel, Guild, Message, PlatformId, User, UserState
 from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
-from .toolkit.decorators import fail_safely
+from .toolkit.decorators import fail_safely, forbid_concurrent_execution
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
 
@@ -231,6 +231,7 @@ class FlowManager(ContextInstanceMixin):
 
     # TODO: This is too complex and should be refactored.  pylint: disable=R0912
     @fail_safely
+    @forbid_concurrent_execution()
     async def _dispatch(self, flow_connector: FlowConnector):
         """Dispatch the flow."""
 

@@ -1,7 +1,6 @@
 import contextvars
 import mimetypes
 import pathlib
-import traceback
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
@@ -94,6 +93,54 @@ class BaseInterface(ABC):
             },
         }
 
+    async def _process_message_file(
+        self,
+        file: File | str | pathlib.Path,
+        message: Message,
+    ):
+        """
+        Send files to the client as a link:
+
+        If the file is a File, the link to the blob storage location will be sent.
+        If the file is a BytesIO object, it will be uploaded to blob storage and the link will be sent.
+        If the file is a string, it will be sent as is so make sure it is a valid URL.
+        If the file is a pathlib.Path object, it will be sent as a link to the static file endpoint.
+
+        Arguments:
+            file: The file to be sent.
+            message: The message to which the file is attached.
+        """
+        if isinstance(file, File) or issubclass(type(file), File):
+            file_url = await universal_file_storage.get_file_url(file.storage_file_object_key)
+            height = file.height
+            width = file.width
+            content_type = file.content_type
+        else:
+            file_url = str(file)
+            content_type, _ = mimetypes.guess_type(file_url)
+            try:
+                with Image.open(file) as img:
+                    width, height = img.width, img.height
+            except Exception:  # pylint: disable=W0718
+                width, height = None, None
+
+        if file_url.startswith(settings.APP_ROOT):
+            file_url = settings.SERVER_URL + file_url[len(settings.APP_ROOT) :]
+
+        data = {
+            "url": file_url,
+            "height": height,
+            "width": width,
+            "content_type": content_type,
+        }
+
+        if isinstance(file, File):
+            await message.files.add(file)
+        else:
+            message.static_files = [*message.static_files, data]
+            await message.save()
+        return data
+
     async def send_message(
         self,
         message: str = "",
@@ -155,53 +202,33 @@ class BaseInterface(ABC):
                 }
             )
 
-    async def _process_message_file(
+    async def send_error(
         self,
-        file: File | str | pathlib.Path,
-        message: Message,
+        error: str,
+        user: Optional[User] = None,
+        channel: Optional[Channel] = None,
     ):
         """
-        Send files to the client as a link:
-
-        If the file is a File, the link to the blob storage location will be sent.
-        If the file is a BytesIO object, it will be uploaded to blob storage and the link will be sent.
-        If the file is a string, it will be sent as is so make sure it is a valid URL.
-        If the file is a pathlib.Path object, it will be sent as a link to the static file endpoint.
+        Send an error message to the client.
 
         Arguments:
-            file: The file to be sent.
-            message: The message to which the file is attached.
+            error: The error message to be sent.
+            traceback: The traceback of the error, if available.
+            user: The user who will receive the error message.
+            channel: The channel the error message is being sent to.
         """
-        if isinstance(file, File) or issubclass(type(file), File):
-            file_url = await universal_file_storage.get_file_url(file.storage_file_object_key)
-            height = file.height
-            width = file.width
-            content_type = file.content_type
-        else:
-            file_url = str(file)
-            content_type, _ = mimetypes.guess_type(file_url)
-            try:
-                with Image.open(file) as img:
-                    width, height = img.width, img.height
-            except Exception:  # pylint: disable=W0718
-                width, height = None, None
-
-        if file_url.startswith(settings.APP_ROOT):
-            file_url = settings.SERVER_URL + file_url[len(settings.APP_ROOT) :]
-
-        data = {
-            "url": file_url,
-            "height": height,
-            "width": width,
-            "content_type": content_type,
-        }
-
-        if isinstance(file, File):
-            await message.files.add(file)
-        else:
-            message.static_files = [*message.static_files, data]
-            await message.save()
-        return data
+        user_data = await self._format_user(user)
+        channel_data = await self._format_channel(channel)
+        await self.send_json(
+            {
+                "action": ResponseTypes.ERROR,
+                "content": {
+                    "user": user_data,
+                    "channel": channel_data,
+                    "error": error,
+                },
+            }
+        )
 
     async def add_role(self, user: User, role: Role):
         """
@@ -292,29 +319,18 @@ class BaseInterface(ABC):
             platform: The platform from which the action was received ().
             data: The data received from the client.
         """
-        try:
-            action = data.get("action")
-            content = data.get("content")
-            if action == FlowConnectorEvents.MESSAGE:
-                content = ReceivedMessage.model_validate(content)
-                await global_flow_manager.on_message(user, platform, content, self)
-            if action == FlowConnectorEvents.BUTTON_CLICK:
-                content = ButtonClick.model_validate(content)
-                await global_flow_manager.on_button_click(user, platform, content, self)
-            if action == FlowConnectorEvents.MEMBER_JOIN:
-                pass
-            if action == FlowConnectorEvents.MEMBER_UPDATE:
-                pass
-        except Exception as exception:  # pylint: disable=W0718
-            await self.send_json(
-                {
-                    "action": ResponseTypes.ERROR,
-                    "content": {
-                        "error": str(exception),
-                        "traceback": traceback.format_exc(),
-                    },
-                }
-            )
+        action = data.get("action")
+        content = data.get("content")
+        if action == FlowConnectorEvents.MESSAGE:
+            content = ReceivedMessage.model_validate(content)
+            await global_flow_manager.on_message(user, platform, content, self)
+        if action == FlowConnectorEvents.BUTTON_CLICK:
+            content = ButtonClick.model_validate(content)
+            await global_flow_manager.on_button_click(user, platform, content, self)
+        if action == FlowConnectorEvents.MEMBER_JOIN:
+            pass
+        if action == FlowConnectorEvents.MEMBER_UPDATE:
+            pass
 
     @abstractmethod
     async def send_json(self, data: Dict[str, Any]):
@@ -331,10 +347,6 @@ class WebSocketInterface(BaseInterface):
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.interface = websocket
-
-    async def disconnect(self):
-        await self.interface.close()
-        self.interface = None
 
     async def stop_process(self, code: int = 1000, reason: Optional[str] = None):
         await super().stop_process()

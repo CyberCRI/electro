@@ -83,7 +83,7 @@ def fail_safely(function: Callable[..., Coroutine]):
                 else:
                     error_text = error_text__template.safe_substitute(**substitute_dict)
                 # Set delete_after=20 to delete the message after 20 seconds
-                await flow_connector.interface.send_message(error_text, delete_after=20)
+                await flow_connector.interface.send_error(error_text, flow_connector.user, flow_connector.channel)
             else:
                 logger.error(f"FlowConnector is not set for the function: {function.__name__} in {args=}")
 
@@ -147,10 +147,10 @@ def forbid_concurrent_execution(
                     )
                 else:
                     logger.warning(f"Extra messages are not allowed for the function: {function.__name__} in {args=}")
-
-            # With the lock acquired, execute the function
-            async with user_lock:
-                return await function(*args, **kwargs)
+            else:
+                # With the lock acquired, execute the function
+                async with user_lock:
+                    return await function(*args, **kwargs)
 
         return wrapper
 
