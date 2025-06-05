@@ -12,6 +12,7 @@ from .authentication import authenticate_user
 from .interfaces import APIInterface, WebSocketInterface
 from .models import Message, PlatformId, User
 from .schemas import CookieToken
+from .settings import settings
 from .toolkit.tortoise_orm import get_tortoise_config
 from .utils import format_historical_message, limit_from_id_paginate_response
 
@@ -23,13 +24,10 @@ app = FastAPI(
     # redoc_url=None,
 )
 
-# CORS
-
-origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
