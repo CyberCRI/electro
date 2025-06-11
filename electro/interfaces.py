@@ -175,16 +175,12 @@ class BaseInterface(ABC):
                 content=message_chunk,
             )
 
-            # Send buttons only with the last message chunk
+            # Send buttons and files only with the last message chunk
             if i == len(message_chunks) - 1:
                 buttons = await self._create_and_format_buttons(buttons, message)
-            else:
-                buttons = []
-
-            # Send files only with the first message chunk
-            if i == 0:
                 processed_files = [await self._process_message_file(file, message) for file in files or []]
             else:
+                buttons = []
                 processed_files = []
 
             data = {
