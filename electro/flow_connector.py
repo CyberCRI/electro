@@ -11,8 +11,7 @@ from .models import Button, Channel, Message, User
 from .storage import ChannelData, UserData
 
 if TYPE_CHECKING:
-    from electro import FlowManager
-
+    from .flow_manager import FlowManager
     from .interfaces import BaseInterface
 
 
