@@ -9,10 +9,15 @@ You can think of it like this: if Storage Bucket is an SQL table, then Storage i
 
 from __future__ import annotations
 
-import typing
+import json
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
-DEFAULT_FLOW_STORAGE_PREFIX = "flow::"
+from redis.asyncio import Redis
+
+from .settings import settings
+
+DEFAULT_FLOW_STORAGE_PREFIX = "flow"
 DEFAULT_MISSING_ADDRESS_PART = "missing"
 
 
@@ -72,12 +77,12 @@ class BaseFlowStorage(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
+    async def set_user_data(self, user_id: int, data: UserData | dict[str, Any] | None):
         """Set the data for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
+    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, Any] | None):
         """Set the data for a channel."""
         raise NotImplementedError
 
@@ -148,11 +153,11 @@ class FlowMemoryStorage(BaseFlowStorage):
 
         return self._channel_data[channel_id]
 
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
+    async def set_user_data(self, user_id: int, data: UserData | dict[str, Any] | None):
         """Set the data for a user."""
         self._user_data[user_id] = data if isinstance(data, UserData) else UserData(**data) if data else UserData()
 
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
+    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, Any] | None):
         """Set the data for a channel."""
         self._channel_data[channel_id] = (
             data if isinstance(data, ChannelData) else ChannelData(**data) if data else ChannelData()
@@ -174,3 +179,105 @@ class FlowMemoryStorage(BaseFlowStorage):
         self._user_data.clear()
         self._channel_states.clear()
         self._channel_data.clear()
+
+
+class FlowRedisStorage(BaseFlowStorage):
+    """The storage used for `Flow`. Stores data for all the users in Redis."""
+
+    def __init__(
+        self,
+        host: str = settings.REDIS_HOST,
+        port: int = settings.REDIS_PORT,
+        db: int = settings.REDIS_DB,
+        password: Optional[str] = settings.REDIS_PASSWORD,
+        prefix: str = DEFAULT_FLOW_STORAGE_PREFIX,
+        state_ttl: Optional[int] = settings.FLOW_STORAGE_STATE_TTL,
+        data_ttl: Optional[int] = settings.FLOW_STORAGE_DATA_TTL,
+    ):
+        self._redis = Redis(
+            host=host,
+            port=port,
+            db=db,
+            password=password,
+            decode_responses=True,
+        )
+        self._prefix = prefix
+        self._state_ttl = state_ttl
+        self._data_ttl = data_ttl
+
+    def _user_state_key(self, user_id: int) -> str:
+        return f"{self._prefix}:user:{user_id}:state"
+
+    def _user_data_key(self, user_id: int) -> str:
+        return f"{self._prefix}:user:{user_id}:data"
+
+    def _channel_state_key(self, channel_id: int) -> str:
+        return f"{self._prefix}:channel:{channel_id}:state"
+
+    def _channel_data_key(self, channel_id: int) -> str:
+        return f"{self._prefix}:channel:{channel_id}:data"
+
+    async def get_user_state(self, user_id: int) -> str | None:
+        return await self._redis.get(self._user_state_key(user_id))
+
+    async def get_channel_state(self, channel_id: int) -> str | None:
+        return await self._redis.get(self._channel_state_key(channel_id))
+
+    async def set_user_state(self, user_id: int, state: str | None):
+        key = self._user_state_key(user_id)
+        if state is None:
+            await self._redis.delete(key)
+        else:
+            await self._redis.set(key, state, ex=self._state_ttl)
+
+    async def set_channel_state(self, channel_id: int, state: str | None):
+        key = self._channel_state_key(channel_id)
+        if state is None:
+            await self._redis.delete(key)
+        else:
+            await self._redis.set(key, state, ex=self._state_ttl)
+
+    async def delete_user_state(self, user_id: int):
+        await self._redis.delete(self._user_state_key(user_id))
+
+    async def delete_channel_state(self, channel_id: int):
+        await self._redis.delete(self._channel_state_key(channel_id))
+
+    async def get_user_data(self, user_id: int) -> UserData:
+        raw = await self._redis.get(self._user_data_key(user_id))
+        return UserData(**json.loads(raw)) if raw else UserData()
+
+    async def get_channel_data(self, channel_id: int) -> ChannelData:
+        raw = await self._redis.get(self._channel_data_key(channel_id))
+        return ChannelData(**json.loads(raw)) if raw else ChannelData()
+
+    async def set_user_data(self, user_id: int, data: UserData | dict[str, Any] | None):
+        key = self._user_data_key(user_id)
+        if data:
+            await self._redis.set(key, json.dumps(dict(data)), ex=self._data_ttl)
+        else:
+            await self._redis.delete(key)
+
+    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, Any] | None):
+        key = self._channel_data_key(channel_id)
+        if data:
+            await self._redis.set(key, json.dumps(dict(data)), ex=self._data_ttl)
+        else:
+            await self._redis.delete(key)
+
+    async def delete_user_data(self, user_id: int):
+        await self._redis.delete(self._user_data_key(user_id))
+
+    async def delete_channel_data(self, channel_id: int):
+        await self._redis.delete(self._channel_data_key(channel_id))
+
+    async def clear(self):
+        # WARNING: This will delete all keys with the prefix!
+        keys = []
+        async for key in self._redis.scan_iter(f"{self._prefix}:*"):
+            keys.append(key)
+        if keys:
+            await self._redis.delete(*keys)
+
+    async def close(self):
+        await self._redis.close()

@@ -78,9 +78,13 @@ class Settings(BaseSettings):
     # Redis settings
     REDIS_URL: RedisDsn | None
     # if the `REDIS_URL` is not set, then use the following credentials:
-    REDIS_HOST: str | None = None
+    REDIS_HOST: str | None = "redis"
     REDIS_PORT: int | None = 6379
     REDIS_DB: int | None = 0
+    REDIS_PASSWORD: str | None = None
+    # Flow storage settings
+    FLOW_STORAGE_STATE_TTL: int | None = None
+    FLOW_STORAGE_DATA_TTL: int | None = None
 
     # Storage settings
     STORAGE_SERVICE_ID: StoragesIDs = "S3"

@@ -13,7 +13,7 @@ from .flow_connector import FlowConnectorEvents
 from .models import Button, Channel, Guild, Message, PlatformId, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
-from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
+from .storage import BaseFlowStorage, ChannelData, FlowRedisStorage, UserData
 from .toolkit.decorators import fail_safely, forbid_concurrent_execution
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
@@ -128,7 +128,7 @@ class FlowManager(ContextInstanceMixin):
     ):
         self.flows: list[Flow] = flows or []
 
-        self.storage = storage or FlowMemoryStorage()
+        self.storage = storage or FlowRedisStorage()
         self.analytics_manager = AnalyticsManager(self)
 
         self._on_finish_callbacks: list[typing.Callable[[FlowConnector], typing.Awaitable[None]]] = (
