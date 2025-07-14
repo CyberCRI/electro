@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from tortoise.contrib.fastapi import register_tortoise
 
 from . import types_ as types
+from .chat_router import chat__router
 from .flow_manager import global_flow_manager
 from .toolkit.tortoise_orm import get_tortoise_config
 
@@ -22,6 +23,8 @@ async def process_message(message: types.Message) -> list[types.MessageToSend] |
 
     return await global_flow_manager.on_message(message)
 
+
+app.include_router(chat__router, prefix="/chat")
 
 # region Register Tortoise
 register_tortoise(

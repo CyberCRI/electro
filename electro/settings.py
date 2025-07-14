@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     OPENAI_CHAT_COMPLETION_MODEL: str = "gpt-4o"
     OPENAI_DALLE_MODEL: str = "dall-e-3"
 
+    OPENAI_API_RUN_FETCH_RETRIES: int = 5
+    OPENAI_API_RUN_FAILED_RETRIES: int = 3
+    OPENAI_API_RUN_RETRIED_RETRIES: int = 3
+
     DEFAULT_SLEEP_TIME: int = 3  # seconds
     SLEEP_TIME_PER_CHARACTER: float = 0.05
 

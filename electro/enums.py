@@ -30,3 +30,33 @@ class ChannelType(Enum):
 
     def __str__(self):
         return self.name
+
+
+# region Real-time Assistant Messages (using SSE)
+class AssistantMessageDeltaType(str, Enum):
+    """The types of deltas for an assistant's chat message."""
+
+    MESSAGE_START = "message_start"
+    MESSAGE_END = "message_end"
+
+    METADATA = "metadata"
+
+    CONTENT_BLOCK = "content_block"
+
+    ERROR = "error"
+
+
+class AssistantType(str, Enum):
+    """The Assistant types."""
+
+    CONVERSATIONAL = "conversational"
+
+
+class FrontendAction(str, Enum):
+    """The Front-end actions."""
+
+    ADD_SPARKLES = "add_sparkles"
+    ADD_BALLOONS = "add_balloons"
+
+
+# endregion

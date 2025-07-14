@@ -5,6 +5,7 @@ from __future__ import annotations
 from tortoise import fields
 from tortoise.fields import ForeignKeyRelation
 
+from .enums import AssistantType
 from .toolkit.images_storage.storages_enums import StoragesIDs
 from .toolkit.tortoise_orm import Model
 
@@ -53,6 +54,8 @@ class User(BaseModel):
     state_changed: fields.ReverseRelation[UserStateChanged]
 
     files: fields.ReverseRelation[File]
+
+    assistant_chat_threads: fields.ReverseRelation[AssistantChatThread]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -259,6 +262,53 @@ class BaseAssistantsStorageModel(BaseStorageModel):
         """The metaclass for the model."""
 
         abstract = True
+
+
+# endregion
+
+
+# region Assistant Chat models
+class Assistant(BaseModel):
+    """The model for an assistant."""
+
+    id = fields.CharField(primary_key=True, max_length=255)
+    assistant_type = fields.CharEnumField(AssistantType, max_length=255)
+
+    chat_threads: fields.ReverseRelation[AssistantChatThread]
+
+
+class AssistantChatThread(BaseModel):
+    """The model for an assistant's chat thread."""
+
+    user: fields.ForeignKeyRelation[User] | User = fields.ForeignKeyField(
+        "electro.User", related_name="assistant_chat_threads", on_delete=fields.SET_NULL, null=True
+    )
+
+    assistant: fields.ForeignKeyRelation[Assistant] | Assistant = fields.ForeignKeyField(
+        "electro.Assistant", related_name="chat_threads", on_delete=fields.SET_NULL, null=True
+    )
+
+    thread_id = fields.TextField()
+
+    name = fields.TextField(null=True)
+    description = fields.TextField(null=True)
+
+    is_completed = fields.BooleanField(default=False)
+
+    messages: fields.ReverseRelation[AssistantChatMessage]
+
+
+class AssistantChatMessage(BaseModel):
+    """The model for an assistant's chat message."""
+
+    thread: fields.ForeignKeyRelation[AssistantChatThread] = fields.ForeignKeyField(
+        "electro.AssistantChatThread", related_name="messages", on_delete=fields.CASCADE
+    )
+
+    message_id = fields.TextField(null=True)
+
+    role = fields.TextField()
+    content = fields.TextField()
 
 
 # endregion
