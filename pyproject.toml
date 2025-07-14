@@ -1,42 +1,57 @@
-[tool.poetry]
+[project]
 name = "electro"
 version = "0.12.2"
 description = "A framework for building bots, made for humans."
-authors = ["Mykola Solodukha <mykola@mykolasolodukha.me>"]
+authors = [{ name = "Mykola Solodukha", email = "mykola@mykolasolodukha.me" }]
+requires-python = "~=3.12.11"
 readme = "README.md"
-packages = [
-    { include = "electro", from = "." },
+dependencies = [
+    "stringcase>=1.2.0,<2",
+    "loguru>=0.7.2,<0.8",
+    "openai>=1.36.0,<2",
+    "pydantic-settings>=2.3.4,<3",
+    "pydantic>=2.8.2,<3",
+    "dj-redis-url>=0.1.4,<0.2",
+    "redis>=5.0.7,<6",
+    "tortoise-orm[asyncpg]>=0.21.5,<0.22",
+    "aerich>=0.7.2,<0.8",
+    "tenacity>=8.5.0,<9",
+    "py-cord",
+    "aioboto3>=13.1.1,<14",
+    "azure-storage-blob>=12.23.1,<13",
+    "azure-identity>=1.18.0,<2",
+    "fastapi[standard]>=0.115.5,<0.116",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-stringcase = "^1.2.0"
-loguru = "^0.7.2"
-openai = "^1.36.0"
-pydantic-settings = "^2.3.4"
-pydantic = "^2.8.2"
-dj-redis-url = "^0.1.4"
-redis = "^5.0.7"
-tortoise-orm = {extras = ["asyncpg"], version = "^0.21.5"}
-aerich = "^0.7.2"
-tenacity = "^8.5.0"
-py-cord = {git = "https://github.com/mykolasolodukha/pycord.git", rev = "d8070a90a8ec12dbc64b703513c14fa80834861d"}
-aioboto3 = "^13.1.1"
-azure-storage-blob = "^12.23.1"
-azure-identity = "^1.18.0"
-fastapi = {extras = ["standard"], version = "^0.115.5"}
+[dependency-groups]
+dev = [
+    "black>=24.8.0,<25",
+    "isort>=5.13.2,<6",
+    "pylint>=3.2.6,<4",
+    "pydocstyle[toml]>=6.3.0,<7",
+    "sphinx>=8.2.0,<9",
+    "sphinx-rtd-theme>=3.0.2,<4",
+    "autodoc-pydantic>=2.2.0,<3",
+    "sphinx-autodoc-typehints>=3.0.1,<4",
+]
 
+[tool.uv]
 
-[tool.poetry.group.dev.dependencies]
-black = "^24.8.0"
-isort = "^5.13.2"
-pylint = "^3.2.6"
-pydocstyle = {extras = ["toml"], version = "^6.3.0"}
-sphinx = "^8.2.0"
-sphinx-rtd-theme = "^3.0.2"
-autodoc-pydantic = "^2.2.0"
-sphinx-autodoc-typehints = "^3.0.1"
+[tool.uv.sources]
+py-cord = { git = "https://github.com/mykolasolodukha/pycord.git", rev = "d8070a90a8ec12dbc64b703513c14fa80834861d" }
 
+[tool.hatch.build.targets.sdist]
+include = ["./electro"]
+
+[tool.hatch.build.targets.wheel]
+include = ["./electro"]
+
+[tool.hatch.build.targets.wheel.sources]
+"./electro" = "electro"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 120
@@ -62,14 +77,8 @@ ignore-patterns = ["tests", "migrations"]  # ignore the tests and migrations fol
 [tool.pydocstyle]
 match-dir = "(?!tests|migrations).*"  # exclude the tests and migrations folders
 
-
 [tool.aerich]
 tortoise_orm = "electro.toolkit.tortoise_orm.TORTOISE_ORM_CONFIG"
 location = "./migrations"
 src_folder = "./../electro"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
