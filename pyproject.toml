@@ -3,7 +3,7 @@ name = "electro"
 version = "0.12.2"
 description = "A framework for building bots, made for humans."
 authors = [{ name = "Mykola Solodukha", email = "mykola@mykolasolodukha.me" }]
-requires-python = "~=3.12.11"
+requires-python = "~=3.12.0"
 readme = "README.md"
 dependencies = [
     "stringcase>=1.2.0,<2",
