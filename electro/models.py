@@ -168,6 +168,7 @@ class Message(BaseModel):
     """The model for Message."""
 
     id = fields.BigIntField(pk=True)
+    flow_code = fields.CharField(max_length=255, null=True)
 
     is_bot_message = fields.BooleanField(default=False)
     is_command = fields.BooleanField(default=False)

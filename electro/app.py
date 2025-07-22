@@ -102,10 +102,11 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
     raise HTTPException(status_code=403, detail="You are not authorized to access this user's information.")
 
 
-@app.get("/api/platform/{platform}/user/{user_id}/messages")
+@app.get("/api/platform/{platform}/user/{user_id}/flow/{flow_code}/messages")
 async def get_user_messages(
     platform: str,
     user_id: str,
+    flow_code: str,
     request_user: Optional[User] = Depends(authenticate_user),
     limit: int = 20,
     from_id: Optional[int] = None,
@@ -126,7 +127,7 @@ async def get_user_messages(
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
     if request_user == user:
-        messages = Message.filter(user=user, is_temporary=False).order_by("-date_added")
+        messages = Message.filter(user=user, flow_code=flow_code, is_temporary=False).order_by("-date_added")
         return await limit_from_id_paginate_response(
             messages,
             format_historical_message,
@@ -137,10 +138,11 @@ async def get_user_messages(
     raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")
 
 
-@app.post("/api/platform/{platform}/user/{user_id}/messages")
+@app.post("/api/platform/{platform}/user/{user_id}/flow/{flow_code}/messages")
 async def process_message(
     platform: str,
     user_id: str,
+    flow_code: str,
     data: Dict[str, Any],
     request_user: Optional[User] = Depends(authenticate_user),
 ):
@@ -152,17 +154,18 @@ async def process_message(
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
     if request_user == user:
-        interface = APIInterface()
-        await interface.handle_incoming_action(user, platform, data)
+        interface = APIInterface(flow_code=flow_code)
+        await interface.handle_incoming_action(user, platform, flow_code, data)
         return interface.messages.get()
     raise HTTPException(status_code=403, detail="You are not authorized to send messages on behalf of this user.")
 
 
-@app.websocket("/websocket/platform/{platform}/user/{user_id}")
+@app.websocket("/websocket/platform/{platform}/user/{user_id}/flow/{flow_code}")
 async def websocket_endpoint(
     websocket: WebSocket,
     platform: str,
     user_id: str,
+    flow_code: str,
     request_user: Optional[User] = Depends(authenticate_user),
 ):
     """Handle the websocket connection."""
@@ -173,12 +176,12 @@ async def websocket_endpoint(
         raise HTTPException(status_code=404, detail="User not found.")
     user = await platform_id.user
     if request_user == user:
-        interface = WebSocketInterface()
+        interface = WebSocketInterface(flow_code=flow_code)
         await interface.connect(websocket)
         try:
             while websocket.application_state == WebSocketState.CONNECTED:
                 data = await websocket.receive_json()
-                asyncio.create_task(interface.handle_incoming_action(user, platform, data))
+                asyncio.create_task(interface.handle_incoming_action(user, platform, flow_code, data))
         except WebSocketDisconnect:
             del interface
     else:

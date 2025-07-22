@@ -31,6 +31,7 @@ class FlowConnector(ContextInstanceMixin):
     flow_manager: FlowManager
     interface: BaseInterface
     event: FlowConnectorEvents
+    flow_code: str
 
     user_state: str | None
     user_data: UserData

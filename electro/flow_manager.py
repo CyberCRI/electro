@@ -79,13 +79,16 @@ class AnalyticsManager(ContextInstanceMixin):
         return channel
 
     @classmethod
-    async def save_message(cls, author: User, platform: str, message_data: schemas.ReceivedMessage) -> Message:
+    async def save_message(
+        cls, author: User, platform: str, flow_code: str, message_data: schemas.ReceivedMessage
+    ) -> Message:
         """Save the message to the database."""
         if message_data.channel:
             channel = await cls.get_or_create_channel(platform, message_data.channel, author)
         else:
             channel = None
         return await Message.create(
+            flow_code=flow_code,
             is_command=message_data.content.startswith(settings.BOT_COMMAND_PREFIX),
             is_bot_message=False,
             user=author,
@@ -139,63 +142,65 @@ class FlowManager(ContextInstanceMixin):
         self.set_current(self)
 
     # region User State and Data management
-    async def _get_user_state(self, user: User) -> str | None:
+    async def _get_user_state(self, user: User, flow_code: str) -> str | None:
         """Get the state of the user."""
-        return await self.storage.get_user_state(user.id)
+        return await self.storage.get_user_state(user.id, flow_code)
 
-    async def _set_user_state(self, user: User, state: str | None):
+    async def _set_user_state(self, user: User, flow_code: str, state: str | None):
         """Set the state of the user."""
         # Save the state to the database
-        old_state = await self._get_user_state(user)
+        old_state = await self._get_user_state(user, flow_code)
         if old_state != state:
             await self.analytics_manager.save_user_state_changed(user, old_state, state)
-        await self.storage.set_user_state(user.id, state)
+        await self.storage.set_user_state(user.id, flow_code, state)
 
-    async def _delete_user_state(self, user: User):
+    async def _delete_user_state(self, user: User, flow_code: str):
         """Delete the state of the user."""
-        old_state = await self._get_user_state(user)
+        old_state = await self._get_user_state(user, flow_code)
         if old_state:
             await self.analytics_manager.save_user_state_changed(user, old_state, None)
-        await self.storage.delete_user_state(user.id)
+        await self.storage.delete_user_state(user.id, flow_code)
 
-    async def _get_user_data(self, user: User) -> UserData:
+    async def _get_user_data(self, user: User, flow_code: str) -> UserData:
         """Get the data of the user."""
-        return await self.storage.get_user_data(user.id)
+        return await self.storage.get_user_data(user.id, flow_code)
 
-    async def _set_user_data(self, user: User, data: UserData | dict[str, typing.Any] | None):
+    async def _set_user_data(self, user: User, flow_code: str, data: UserData | dict[str, typing.Any] | None):
         """Set the data of the user."""
-        await self.storage.set_user_data(user.id, data)
+        await self.storage.set_user_data(user.id, flow_code, data)
 
-    async def _delete_user_data(self, user: User):
+    async def _delete_user_data(self, user: User, flow_code: str):
         """Delete the data of the user."""
-        await self.storage.delete_user_data(user.id)
+        await self.storage.delete_user_data(user.id, flow_code)
 
     # endregion
 
     # region Channel State and Data management
-    async def _get_channel_state(self, channel: Channel) -> str | None:
+    async def _get_channel_state(self, channel: Channel, flow_code: str) -> str | None:
         """Get the state of the channel."""
-        return await self.storage.get_channel_state(channel.id)
+        return await self.storage.get_channel_state(channel.id, flow_code)
 
-    async def _set_channel_state(self, channel: Channel, state: str | None):
+    async def _set_channel_state(self, channel: Channel, flow_code: str, state: str | None):
         """Set the state of the channel."""
-        await self.storage.set_channel_state(channel.id, state)
+        await self.storage.set_channel_state(channel.id, flow_code, state)
 
-    async def _delete_channel_state(self, channel: Channel):
+    async def _delete_channel_state(self, channel: Channel, flow_code: str):
         """Delete the state of the channel."""
-        await self.storage.delete_channel_state(channel.id)
+        await self.storage.delete_channel_state(channel.id, flow_code)
 
-    async def _get_channel_data(self, channel: Channel) -> ChannelData:
+    async def _get_channel_data(self, channel: Channel, flow_code: str) -> ChannelData:
         """Get the data of the channel."""
-        return await self.storage.get_channel_data(channel.id)
+        return await self.storage.get_channel_data(channel.id, flow_code)
 
-    async def _set_channel_data(self, channel: Channel, data: ChannelData | dict[str, typing.Any] | None):
+    async def _set_channel_data(
+        self, channel: Channel, flow_code: str, data: ChannelData | dict[str, typing.Any] | None
+    ):
         """Set the data of the channel."""
-        await self.storage.set_channel_data(channel.id, data)
+        await self.storage.set_channel_data(channel.id, flow_code, data)
 
-    async def _delete_channel_data(self, channel: Channel):
+    async def _delete_channel_data(self, channel: Channel, flow_code: str):
         """Delete the data of the channel."""
-        await self.storage.delete_channel_data(channel.id)
+        await self.storage.delete_channel_data(channel.id, flow_code)
 
     # endregion
 
@@ -221,8 +226,8 @@ class FlowManager(ContextInstanceMixin):
     async def _finish_flow(self, flow_connector: FlowConnector):
         """Finish the flow."""
         # Delete the state and data for the user
-        await self.storage.delete_user_state(flow_connector.user.id)
-        await self.storage.delete_user_data(flow_connector.user.id)
+        await self.storage.delete_user_state(flow_connector.user.id, flow_connector.flow_code)
+        await self.storage.delete_user_data(flow_connector.user.id, flow_connector.flow_code)
 
         # Run the callbacks
         for callback in self._on_finish_callbacks:
@@ -257,7 +262,7 @@ class FlowManager(ContextInstanceMixin):
             ):
                 if scope == FlowScopes.USER:
                     # Remove user's state, so that the user wouldn't resume any flow
-                    await self.storage.delete_user_state(flow_connector.user.id)
+                    await self.storage.delete_user_state(flow_connector.user.id, flow_connector.flow_code)
 
                     raise EventCannotBeProcessed(
                         f"The message is a command that is not handled by any of the flows: "
@@ -325,23 +330,23 @@ class FlowManager(ContextInstanceMixin):
             return await self._dispatch(flow_connector)
 
     async def on_message(
-        self, user: User, platform: str, message_data: schemas.ReceivedMessage, interface: BaseInterface
+        self, user: User, platform: str, flow_code: str, message_data: schemas.ReceivedMessage, interface: BaseInterface
     ):
         """Handle the messages sent by the users."""
 
         # Save the message to the database
-        message = await self.analytics_manager.save_message(user, platform, message_data)
+        message = await self.analytics_manager.save_message(user, platform, flow_code, message_data)
         channel = await message.channel
 
         # Get the user state and data
         # TODO: [20.08.2023 by Mykola] Use context manager for this
-        user_state = await self._get_user_state(user)
-        user_data = await self._get_user_data(user)
+        user_state = await self._get_user_state(user, flow_code)
+        user_data = await self._get_user_data(user, flow_code)
 
         # Get the channel state and data
         if channel:
-            channel_state = await self._get_channel_state(message.channel)
-            channel_data = await self._get_channel_data(message.channel)
+            channel_state = await self._get_channel_state(message.channel, flow_code)
+            channel_data = await self._get_channel_data(message.channel, flow_code)
         else:
             channel_state = None
             channel_data = ChannelData()
@@ -349,6 +354,7 @@ class FlowManager(ContextInstanceMixin):
         flow_connector = FlowConnector(
             flow_manager=self,
             event=FlowConnectorEvents.MESSAGE,
+            flow_code=flow_code,
             user=user,
             channel=channel,
             message=message,
@@ -362,7 +368,7 @@ class FlowManager(ContextInstanceMixin):
         return await self.dispatch(flow_connector)
 
     async def on_button_click(
-        self, user: User, platform: str, button_data: schemas.ButtonClick, interface: BaseInterface
+        self, user: User, platform: str, flow_code: str, button_data: schemas.ButtonClick, interface: BaseInterface
     ):
         """Handle the buttons clicked by the users."""
         # Save the button click to the database
@@ -373,17 +379,18 @@ class FlowManager(ContextInstanceMixin):
             return await interface.send_message("button already clicked", user, channel)
 
         # Get the user state and data
-        user_state = await self._get_user_state(user)
-        user_data = await self._get_user_data(user)
+        user_state = await self._get_user_state(user, flow_code)
+        user_data = await self._get_user_data(user, flow_code)
 
         # Get the channel state and data
-        channel_state = await self._get_channel_state(channel)
-        channel_data = await self._get_channel_data(channel)
+        channel_state = await self._get_channel_state(channel, flow_code)
+        channel_data = await self._get_channel_data(channel, flow_code)
 
         # noinspection PyTypeChecker
         flow_connector = FlowConnector(
             flow_manager=self,
             event=FlowConnectorEvents.BUTTON_CLICK,
+            flow_code=flow_code,
             user=user,
             channel=channel,
             button=button,
@@ -462,13 +469,15 @@ class FlowManager(ContextInstanceMixin):
 
         # After the flow step(s) is/are run, update the user state and data
         if flow_connector.user:
-            await self._set_user_state(flow_connector.user, flow_connector.user_state)
-            await self._set_user_data(flow_connector.user, flow_connector.user_data)
+            await self._set_user_state(flow_connector.user, flow_connector.flow_code, flow_connector.user_state)
+            await self._set_user_data(flow_connector.user, flow_connector.flow_code, flow_connector.user_data)
 
         # Also, update the channel state and data
         if flow_connector.channel:
-            await self._set_channel_state(flow_connector.channel, flow_connector.channel_state)
-            await self._set_channel_data(flow_connector.channel, flow_connector.channel_data)
+            await self._set_channel_state(
+                flow_connector.channel, flow_connector.flow_code, flow_connector.channel_state
+            )
+            await self._set_channel_data(flow_connector.channel, flow_connector.flow_code, flow_connector.channel_data)
 
     # endregion
 

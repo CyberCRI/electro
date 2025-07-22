@@ -30,6 +30,9 @@ class BaseInterface(ABC):
     more incoming actions from the client.
     """
 
+    def __init__(self, flow_code: str = ""):
+        self.flow_code = flow_code
+
     async def _create_and_format_buttons(
         self, buttons: Optional[List["BaseButton"]] = None, message: Optional[Message] = None
     ) -> List[Button]:
@@ -168,6 +171,7 @@ class BaseInterface(ABC):
         channel_data = await self._format_channel(channel)
         for i, message_chunk in enumerate(message_chunks):
             message = await Message.create(
+                flow_code=self.flow_code,
                 is_temporary=delete_after is not None,
                 is_bot_message=True,
                 user=user,
@@ -306,7 +310,7 @@ class BaseInterface(ABC):
         await self.set_typing(user, channel, ResponseTypes.STOP_TYPING)
 
     async def handle_incoming_action(
-        self, user: User, platform: SupportedPlatforms, data: Dict[str, Any]
+        self, user: User, platform: SupportedPlatforms, flow_code: str, data: Dict[str, Any]
     ) -> Tuple[Dict[str, str], int]:
         """
         Handle incoming actions from the client. The action data is validated and processed.
@@ -319,10 +323,10 @@ class BaseInterface(ABC):
         content = data.get("content")
         if action == FlowConnectorEvents.MESSAGE:
             content = ReceivedMessage.model_validate(content)
-            await global_flow_manager.on_message(user, platform, content, self)
+            await global_flow_manager.on_message(user, platform, flow_code, content, self)
         if action == FlowConnectorEvents.BUTTON_CLICK:
             content = ButtonClick.model_validate(content)
-            await global_flow_manager.on_button_click(user, platform, content, self)
+            await global_flow_manager.on_button_click(user, platform, flow_code, content, self)
         if action == FlowConnectorEvents.MEMBER_JOIN:
             pass
         if action == FlowConnectorEvents.MEMBER_UPDATE:
@@ -337,7 +341,8 @@ class BaseInterface(ABC):
 class WebSocketInterface(BaseInterface):
     """WebSocket Interface for the Electro framework."""
 
-    def __init__(self):
+    def __init__(self, flow_code: str = ""):
+        super().__init__(flow_code=flow_code)
         self.interface: WebSocket | None = None
 
     async def connect(self, websocket: WebSocket):
@@ -355,7 +360,8 @@ class WebSocketInterface(BaseInterface):
 class APIInterface(BaseInterface):
     """API Interface for the Electro framework."""
 
-    def __init__(self):
+    def __init__(self, flow_code: str = ""):
+        super().__init__(flow_code=flow_code)
         self.messages = contextvars.ContextVar("messages")
         self.messages.set([])
 
