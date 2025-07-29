@@ -302,6 +302,19 @@ class BaseInterface(ABC):
             }
         )
 
+    async def finish_flow(self):
+        """
+        Finish the flow for the client.
+
+        This is used to finish the flow for the client and close the connection.
+        """
+        await self.send_json(
+            {
+                "action": ResponseTypes.FINISH_FLOW,
+                "content": {},
+            }
+        )
+
     @asynccontextmanager
     async def with_constant_typing(self, user: User, channel: Channel):
         """An asynchronous context manager for typing indicators or other tasks."""

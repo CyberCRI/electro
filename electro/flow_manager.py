@@ -232,6 +232,7 @@ class FlowManager(ContextInstanceMixin):
         # Run the callbacks
         for callback in self._on_finish_callbacks:
             await callback(flow_connector)
+        await flow_connector.interface.finish_flow()
         return
 
     # TODO: This is too complex and should be refactored.  pylint: disable=R0912

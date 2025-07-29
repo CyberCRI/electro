@@ -22,3 +22,4 @@ class ResponseTypes(str, Enum):
     START_TYPING = "start_typing"
     STOP_TYPING = "stop_typing"
     STOP_PROCESS = "stop_process"
+    FINISH_FLOW = "finish_flow"
