@@ -191,7 +191,7 @@ async def websocket_endpoint(
 @app.post("/api/cookies")
 async def set_cookie(data: CookieToken, response: Response):
     cookie_value = "" if data.token is None else data.token
-    response.set_cookie(key="Authorization", value=cookie_value)
+    response.set_cookie(key="IKIGAI_AUTHORIZATION", value=cookie_value)
     return {"status": "ok"}
 
 

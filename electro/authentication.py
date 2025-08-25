@@ -12,7 +12,7 @@ async def authenticate_user(
     platform: str,
     user_id: str,
     header: Optional[str] = Header(default=None, alias="Authorization"),
-    cookie: Optional[str] = Cookie(default=None, alias="Authorization"),
+    cookie: Optional[str] = Cookie(default=None, alias="IKIGAI_AUTHORIZATION"),
 ) -> User:
     """Validate the Bearer token provided in the request header or in the cookie."""
     # Determine the authentication method based on the platform
@@ -25,7 +25,7 @@ async def authenticate_user(
     # Get the authorization token from the header or cookie
     authorization = header or cookie
     if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header or cookie is required.")
+        raise HTTPException(status_code=401, detail="Authorization header or IKIGAI_AUTHORIZATION cookie is required.")
     if header and authentication_method == "jwt":
         if not authorization.startswith(f"{settings.JWT_TOKEN_TYPE} "):
             raise HTTPException(status_code=401, detail=f"Authorization header type must be {settings.JWT_TOKEN_TYPE}")
