@@ -45,7 +45,6 @@ class Settings(BaseSettings):
     MESSAGE_SLEEP_INSTRUCTION_PATTERN: str = r"--- sleep (\d+.?\d*) seconds ---"
     MESSAGE_MAX_LENGTH: int = 1900  # 2000 - 100 (safe margin)
     BOT_COMMAND_PREFIX: str = "!"
-    BOT_LANGUAGE: str = "en"  # Should mirror the `DEFAULT_LOCALE` setting. User in the Python code
     GO_BACK_COMMAND: str = "_go_back"
     RELOAD_COMMAND: str = "_reload"
     # Validate GO_BACK_COMMAND
@@ -63,7 +62,7 @@ class Settings(BaseSettings):
 
     # Locales settings
     LOCALES_PATH: str = "locales"  # Relative to the current working directory
-    DEFAULT_LOCALE: str = "en"  # Should mirror the `BOT_LANGUAGE` setting. User in the `make upload-locales` target
+    DEFAULT_LOCALE: str = "en"
 
     # Database settings
     DATABASE_URL: PostgresDsn | None = None

@@ -9,9 +9,8 @@ from electro.exceptions import EventCannotBeProcessed
 from electro.flow_connector import FlowConnector, FlowConnectorEvents
 from electro.models import Channel, Message
 from electro.settings import settings
-from electro.toolkit.i18n_gettext import _
+from electro.toolkit.i18n import _, TranslatedString
 from electro.toolkit.loguru_logging import logger
-from electro.toolkit.templated_i18n import TemplatedString
 
 
 def with_constant_typing(
@@ -113,7 +112,7 @@ GLOBAL_USER_LOCKS: defaultdict[int, Lock] = defaultdict(Lock)
 
 def forbid_concurrent_execution(
     keep_extra_messages=False,
-    extra_messages_reply: TemplatedString | None = _("forbidden_concurrent_execution.extra_messages_reply"),
+    extra_messages_reply: TranslatedString | None = _("forbidden_concurrent_execution.extra_messages_reply"),
 ) -> Callable:
     """Forbid concurrent execution of the function for the same User."""
 

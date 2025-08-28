@@ -19,8 +19,8 @@ from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.decorators import with_constant_typing
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
+from .toolkit.i18n import TranslatedString
 from .toolkit.loguru_logging import logger
-from .toolkit.templated_i18n import TemplatedString
 
 if typing.TYPE_CHECKING:
     from .contrib.buttons import ActionButton
@@ -55,13 +55,13 @@ class MessageFormatterMixin:
 
     substitutions: dict[str, str] | None = None
 
-    async def _get_formatted_message(self, message: TemplatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
         generic_substitutions: dict[str, str | int | BaseSubstitution] = (
             connector.user_data | (connector.substitutions or {}) | (self.substitutions or {}) | kwargs
         )
 
-        variables_used_in_message = message.get_identifiers()
+        variables_used_in_message = message.get_identifiers(connector.user.locale)
         logger.debug(
             f"Variables used in the message: {variables_used_in_message}, {generic_substitutions=}, {message=}"
         )
@@ -198,8 +198,8 @@ def callback_handler(
 class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     """The class for `MessageFlowStep`."""
 
-    message: TemplatedString | None = None
-    response_message: TemplatedString | None = None
+    message: TranslatedString | None = None
+    response_message: TranslatedString | None = None
 
     channel_to_send_to: Channel | BaseSubstitution | GlobalAbstractChannel | None = None
 
@@ -208,7 +208,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     buttons: typing.List[ActionButton] | None = None
 
     validator: typing.Callable[[str], bool] | None = None
-    validator_error_message: TemplatedString | None = None
+    validator_error_message: TranslatedString | None = None
 
     # TODO: [27.09.2023 by Mykola] Make this automatic, on the `Flow` level
     save_response_to_storage: StorageBucketElement | None = None
@@ -234,13 +234,13 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     async def send_message(
         self,
         connector: FlowConnector,
-        message: TemplatedString | str,
+        message: TranslatedString | str,
         channel: Channel | BaseSubstitution[Channel] | None = None,
         buttons: typing.Optional[typing.List[ActionButton]] = None,
     ):
         """Send the message."""
         message: str | None = (
-            await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
+            await self._get_formatted_message(message, connector) if isinstance(message, TranslatedString) else message
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         files = await self._get_files_to_send(connector)
@@ -317,21 +317,18 @@ class SendImageFlowStep(MessageFlowStep):
     file: File | pathlib.Path | BytesIO | str | None = None
     caption: str = ""
 
-    language: str | None = None
-
     force_blocking_step: bool = False
 
-    def __post_init__(self):
+    def _select_image_language(self, locale: str):
         """Post-initialization."""
         # If the user doesn't want to force the blocking step, set the `non_blocking` flag to `True`
         if not self.force_blocking_step:
             self.non_blocking = True
 
         # If the language is set, try to use the language-specific file
-        if self.language and isinstance(self.file, pathlib.Path):
-            language = self.language.lower()
+        if isinstance(self.file, pathlib.Path):
             file, extention = str(self.file).rsplit(".", 1)
-            language_specific_file = f"{file}__{language}.{extention}"
+            language_specific_file = f"{file}__{locale}.{extention}"
             try:
                 with open(language_specific_file, "rb"):
                     self.file = language_specific_file
@@ -344,13 +341,14 @@ class SendImageFlowStep(MessageFlowStep):
     async def send_message(
         self,
         connector: FlowConnector,
-        message: TemplatedString | str,
+        message: TranslatedString | str,
         channel: Channel | BaseSubstitution[Channel] | None = None,
         buttons: typing.Optional[typing.List[ActionButton]] = None,
     ):
         """Send the message."""
+        self._select_image_language(connector.user.locale)
         message: str | None = (
-            await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
+            await self._get_formatted_message(message, connector) if isinstance(message, TranslatedString) else message
         )
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         await connector.interface.send_message(
@@ -427,15 +425,15 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
     openai_client: AsyncOpenAI | None = None
     chat_completion_model: str | None = None
 
-    message_prompt: TemplatedString | None = None
-    response_message_prompt: TemplatedString | None = None
+    message_prompt: TranslatedString | None = None
+    response_message_prompt: TranslatedString | None = None
 
     response_format: ChatGPTResponseFormat | str = ChatGPTResponseFormat.AUTO
 
     save_prompt_response_to_storage: StorageBucketElement | None = None
     parse_json_before_saving: bool | None = None
 
-    async def _get_formatted_message(self, message: TemplatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
         if not self.message_prompt:
             return await super()._get_formatted_message(message, connector, **kwargs)
@@ -482,8 +480,8 @@ class AcceptFileStep(MessageFlowStep):
 
     storage_to_save_saved_file_id_to: BaseStorageBucketElement | None = None
 
-    file_is_required_message: TemplatedString | str = "You need to upload a file."
-    file_saved_confirmation_message: TemplatedString | str | None = None
+    file_is_required_message: TranslatedString | str = "You need to upload a file."
+    file_saved_confirmation_message: TranslatedString | str | None = None
 
     allow_skip: bool = False
 

@@ -15,6 +15,7 @@ from .models import Button, Channel, File, Guild, Message, Role, User
 from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
+from .toolkit.i18n import resolve_translation, TranslatedString
 
 if TYPE_CHECKING:
     from .contrib.buttons import BaseButton
@@ -34,16 +35,17 @@ class BaseInterface(ABC):
         self.flow_code = flow_code
 
     async def _create_and_format_buttons(
-        self, buttons: Optional[List["BaseButton"]] = None, message: Optional[Message] = None
+        self, user: User, buttons: Optional[List["BaseButton"]] = None, message: Optional[Message] = None
     ) -> List[Button]:
         """Format the buttons to be sent to the client."""
         response = []
         for button in buttons or []:
+            label = resolve_translation(button.label, user.locale)
             button_object = await Button.create(
                 message=message,
                 custom_id=button.custom_id,
                 style=button.style,
-                label=button.label,
+                label=label,
                 remove_after_click=button.remove_after_click,
                 extra_data=getattr(button, "extra_data", {}),
             )
@@ -146,7 +148,7 @@ class BaseInterface(ABC):
 
     async def send_message(
         self,
-        message: str = "",
+        message: str | TranslatedString = "",
         user: Optional[User] = None,
         channel: Optional[Channel] = None,
         files: Optional[List[Union[File, str, pathlib.Path]]] = None,
@@ -166,6 +168,7 @@ class BaseInterface(ABC):
                 - if "next", the message will be deleted after the next message is sent.
                 - if an integer, the message will be deleted after that many seconds.
         """
+        message = resolve_translation(message, user.locale) or ""
         message_chunks = message.split(settings.MESSAGE_BREAK)
         user_data = await self._format_user(user)
         channel_data = await self._format_channel(channel)
@@ -181,7 +184,7 @@ class BaseInterface(ABC):
 
             # Send buttons and files only with the last message chunk
             if i == len(message_chunks) - 1:
-                buttons = await self._create_and_format_buttons(buttons, message)
+                buttons = await self._create_and_format_buttons(user, buttons, message)
                 processed_files = [await self._process_message_file(file, message) for file in files or []]
             else:
                 buttons = []
@@ -204,7 +207,7 @@ class BaseInterface(ABC):
 
     async def send_error(
         self,
-        error: str,
+        error: str | TranslatedString,
         user: Optional[User] = None,
         channel: Optional[Channel] = None,
     ):
@@ -217,6 +220,7 @@ class BaseInterface(ABC):
             user: The user who will receive the error message.
             channel: The channel the error message is being sent to.
         """
+        error = resolve_translation(error, user.locale)
         user_data = await self._format_user(user)
         channel_data = await self._format_channel(channel)
         await self.send_json(
