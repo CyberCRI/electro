@@ -45,8 +45,8 @@ class TranslatedString:
 
 def resolve_translation(text: str | TranslatedString, locale: str) -> str:
     if isinstance(text, TranslatedString):
-        return text.resolve(locale)
-    return text
+        return text.resolve(locale) or ""
+    return text or ""
 
 
 _ = TranslatedString

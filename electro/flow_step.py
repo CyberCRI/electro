@@ -19,7 +19,7 @@ from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.decorators import with_constant_typing
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
-from .toolkit.i18n import TranslatedString
+from .toolkit.i18n import resolve_translation, TranslatedString
 from .toolkit.loguru_logging import logger
 
 if typing.TYPE_CHECKING:
@@ -55,8 +55,10 @@ class MessageFormatterMixin:
 
     substitutions: dict[str, str] | None = None
 
-    async def _get_formatted_message(self, message: TranslatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString | str, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
+        if not isinstance(message, TranslatedString):
+            return message or ""
         generic_substitutions: dict[str, str | int | BaseSubstitution] = (
             connector.user_data | (connector.substitutions or {}) | (self.substitutions or {}) | kwargs
         )
@@ -76,9 +78,7 @@ class MessageFormatterMixin:
             if key in variables_used_in_message
         }
 
-        return message.safe_substitute(
-            **substitutions,
-        )
+        return resolve_translation(message.safe_substitute(**substitutions), connector.user.locale)
 
 
 @dataclass(kw_only=True)
@@ -239,9 +239,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
         buttons: typing.Optional[typing.List[ActionButton]] = None,
     ):
         """Send the message."""
-        message: str | None = (
-            await self._get_formatted_message(message, connector) if isinstance(message, TranslatedString) else message
-        )
+        message = await self._get_formatted_message(message, connector)
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         files = await self._get_files_to_send(connector)
         await connector.interface.send_message(message, connector.user, channel_to_send_to, files, buttons)
@@ -347,9 +345,7 @@ class SendImageFlowStep(MessageFlowStep):
     ):
         """Send the message."""
         self._select_image_language(connector.user.locale)
-        message: str | None = (
-            await self._get_formatted_message(message, connector) if isinstance(message, TranslatedString) else message
-        )
+        message = await self._get_formatted_message(message, connector)
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         await connector.interface.send_message(
             self.caption, connector.user, channel_to_send_to, [self.file], buttons=buttons
@@ -433,7 +429,7 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
     save_prompt_response_to_storage: StorageBucketElement | None = None
     parse_json_before_saving: bool | None = None
 
-    async def _get_formatted_message(self, message: TranslatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString | str, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
         if not self.message_prompt:
             return await super()._get_formatted_message(message, connector, **kwargs)

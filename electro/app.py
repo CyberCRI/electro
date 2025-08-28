@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 
-@app.patch("/api/platforms/{platform}/user/{user_id}")
+@app.patch("/api/platform/{platform}/user/{user_id}")
 async def update_user(
     platform: str,
     user_id: str,
@@ -56,12 +56,14 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found.")
     user: User = await platform_id.user
     if request_user == user:
-        if "username" in data:
-            user.username = data["username"]
-            await user.save()
+        for field in ["username", "locale"]:
+            if field in data:
+                setattr(user, field, data[field])
+        await user.save()
         return {
             "id": user.id,
             "username": user.username,
+            "locale": user.locale,
             "platform_ids": [
                 {
                     "platform": platform.platform,
@@ -90,6 +92,7 @@ async def get_user(platform: str, user_id: str, request_user: Optional[User] = D
         return {
             "id": user.id,
             "username": user.username,
+            "locale": user.locale,
             "platform_ids": [
                 {
                     "platform": platform.platform,

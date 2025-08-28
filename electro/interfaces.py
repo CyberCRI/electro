@@ -168,7 +168,7 @@ class BaseInterface(ABC):
                 - if "next", the message will be deleted after the next message is sent.
                 - if an integer, the message will be deleted after that many seconds.
         """
-        message = resolve_translation(message, user.locale) or ""
+        message = resolve_translation(message, user.locale)
         message_chunks = message.split(settings.MESSAGE_BREAK)
         user_data = await self._format_user(user)
         channel_data = await self._format_channel(channel)
