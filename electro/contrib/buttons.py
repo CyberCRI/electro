@@ -7,6 +7,7 @@ from enum import Enum
 
 from ..flow_connector import FlowConnector
 from ..flow_step import BaseFlowStep, FlowStepDone
+from ..toolkit.i18n import TranslatedString
 
 CALLBACK_TYPE = typing.Callable[[FlowConnector], typing.Awaitable[None]] | BaseFlowStep | None
 
@@ -35,7 +36,7 @@ class BaseButton(ABC):
 
     def __init__(
         self,
-        label: str | None = None,
+        label: str | TranslatedString | None = None,
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = False,
@@ -55,7 +56,7 @@ class DataButton(BaseButton):
 
     def __init__(
         self,
-        label: str | None = None,
+        label: str | TranslatedString | None = None,
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = False,
@@ -116,7 +117,7 @@ class GoToFlowButton(ActionButton):
 class ConfirmButton(ActionButton):
     def __init__(
         self,
-        label: str | None = None,
+        label: str | TranslatedString | None = None,
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = True,

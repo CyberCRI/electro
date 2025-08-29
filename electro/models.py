@@ -7,6 +7,7 @@ from enum import Enum
 from tortoise import fields
 from tortoise.fields import ForeignKeyRelation, ManyToManyField
 
+from .settings import settings
 from .toolkit.files_storage.storages_enums import StoragesIDs
 from .toolkit.tortoise_orm import Model
 
@@ -73,7 +74,7 @@ class User(BaseModel):
 
     id = fields.BigIntField(pk=True)
     username = fields.CharField(max_length=255)
-    locale = fields.CharField(max_length=255, null=True)
+    locale = fields.CharField(max_length=255, default=settings.DEFAULT_LOCALE)
     is_admin = fields.BooleanField(default=False)
 
     # guilds: fields.ManyToManyRelation["Guild"]  # TODO: [2024-08-30 by Mykola] Allow multiple guilds for the user.
