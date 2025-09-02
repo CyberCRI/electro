@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketState
 from tortoise.contrib.fastapi import register_tortoise
 
-from .authentication import authenticate_user
+from .authentication import ElectroAuthentication
 from .interfaces import APIInterface, WebSocketInterface
 from .models import Message, PlatformId, User
 from .schemas import CookieToken
@@ -39,7 +39,7 @@ async def update_user(
     platform: str,
     user_id: str,
     data: Dict[str, Any],
-    request_user: Optional[User] = Depends(authenticate_user),
+    request_user: Optional[User] = Depends(ElectroAuthentication.authenticate_user),
 ):
     """
     Update the user information.
@@ -77,7 +77,9 @@ async def update_user(
 
 
 @app.get("/api/platform/{platform}/user/{user_id}")
-async def get_user(platform: str, user_id: str, request_user: Optional[User] = Depends(authenticate_user)):
+async def get_user(
+    platform: str, user_id: str, request_user: Optional[User] = Depends(ElectroAuthentication.authenticate_user)
+):
     """
     Test the API endpoint.
     """
@@ -110,7 +112,7 @@ async def get_user_messages(
     platform: str,
     user_id: str,
     flow_code: str,
-    request_user: Optional[User] = Depends(authenticate_user),
+    request_user: Optional[User] = Depends(ElectroAuthentication.authenticate_user),
     limit: int = 20,
     from_id: Optional[int] = None,
 ):
@@ -147,7 +149,7 @@ async def process_message(
     user_id: str,
     flow_code: str,
     data: Dict[str, Any],
-    request_user: Optional[User] = Depends(authenticate_user),
+    request_user: Optional[User] = Depends(ElectroAuthentication.authenticate_user),
 ):
     """Process the message."""
     platform_id = await PlatformId.get_or_none(
@@ -169,7 +171,7 @@ async def websocket_endpoint(
     platform: str,
     user_id: str,
     flow_code: str,
-    request_user: Optional[User] = Depends(authenticate_user),
+    request_user: Optional[User] = Depends(ElectroAuthentication.authenticate_user),
 ):
     """Handle the websocket connection."""
     platform_id = await PlatformId.get_or_none(
