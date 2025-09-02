@@ -1,4 +1,4 @@
-"""The substitutions' module. Used to substitute the variables in all the `TemplatedString`s."""
+"""The substitutions' module. Used to substitute the variables in all the `TranslatedString`s."""
 
 from __future__ import annotations
 
