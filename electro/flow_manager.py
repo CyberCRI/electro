@@ -15,6 +15,7 @@ from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowRedisStorage, UserData
 from .toolkit.decorators import fail_safely, forbid_concurrent_execution
+from .toolkit.i18n import _
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
 
@@ -377,7 +378,7 @@ class FlowManager(ContextInstanceMixin):
         try:
             button = await self.analytics_manager.save_button_click(button_data.id)
         except DisabledButtonClick:
-            return await interface.send_message("button already clicked", user, channel)
+            return await interface.send_message(_("buttons.already_clicked"), user, channel)
 
         # Get the user state and data
         user_state = await self._get_user_state(user, flow_code)
