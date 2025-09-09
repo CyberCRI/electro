@@ -317,7 +317,7 @@ class SendImageFlowStep(MessageFlowStep):
 
     force_blocking_step: bool = False
 
-    def _select_image_language(self, locale: str):
+    def get_translated_image(self, locale: str) -> str | None:
         """Post-initialization."""
         # If the user doesn't want to force the blocking step, set the `non_blocking` flag to `True`
         if not self.force_blocking_step:
@@ -329,12 +329,13 @@ class SendImageFlowStep(MessageFlowStep):
             language_specific_file = f"{file}__{locale}.{extention}"
             try:
                 with open(language_specific_file, "rb"):
-                    self.file = language_specific_file
+                    return language_specific_file
             except FileNotFoundError:
                 logger.warning(
                     f"In step {self.__class__.__name__}: "
                     f"Language-specific file {language_specific_file} does not exist. Using the default."
                 )
+        return None
 
     async def send_message(
         self,
@@ -344,11 +345,12 @@ class SendImageFlowStep(MessageFlowStep):
         buttons: typing.Optional[typing.List[ActionButton]] = None,
     ):
         """Send the message."""
-        self._select_image_language(connector.user.locale)
+        translated_image = self.get_translated_image(connector.user.locale)
+        file = translated_image or self.file
         message = await self._get_formatted_message(message, connector)
         channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
         await connector.interface.send_message(
-            self.caption, connector.user, channel_to_send_to, [self.file], buttons=buttons
+            self.caption, connector.user, channel_to_send_to, [file], buttons=buttons
         )
 
 
