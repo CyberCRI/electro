@@ -138,7 +138,7 @@ async def get_user_messages(
             format_historical_message,
             limit=limit,
             from_id=from_id,
-            url=f"/api/platform/{platform}/user/{user_id}/messages",
+            url=f"/api/platform/{platform}/user/{user_id}/flow/{flow_code}/messages",
         )
     raise HTTPException(status_code=403, detail="You are not authorized to access this user's message history.")
 
