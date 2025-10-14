@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     ENABLE_DATABASE_SSL: bool = True
 
     # Redis settings
-    REDIS_URL: RedisDsn | None
+    REDIS_URL: RedisDsn | None = None
     # if the `REDIS_URL` is not set, then use the following credentials:
     REDIS_HOST: str | None = "redis"
     REDIS_PORT: int | None = 6379
