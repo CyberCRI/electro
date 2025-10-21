@@ -245,33 +245,4 @@ class BaseStorageModel(BaseModel):
         abstract = True
 
 
-class BaseImagesStepStorageModel(BaseStorageModel):
-    """The base model for images step storage models."""
-
-    buttons_sent_to_images = fields.JSONField(default=dict, null=True)
-    images_sent_in_this_step = fields.JSONField(default=list, null=True)
-    image_chosen = fields.CharField(max_length=255, null=True)
-    # TODO: [2024-11-08 by Mykola] Add this later to maintain compatibility with the old data
-    # TODO: [2024-11-08 by Mykola] Remove this from this model. It should be downstream
-    # metaphors = fields.JSONField(default=list, null=True)
-
-    load_more_button_custom_id = fields.CharField(max_length=255, null=True)
-
-    class Meta:
-        """The metaclass for the model."""
-
-        abstract = True
-
-
-class BaseAssistantsStorageModel(BaseStorageModel):
-    """The base model for OpenAI Assistants storage models."""
-
-    thread_id = fields.CharField(max_length=255, null=True)
-
-    class Meta:
-        """The metaclass for the model."""
-
-        abstract = True
-
-
 # endregion

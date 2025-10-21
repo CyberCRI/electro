@@ -305,7 +305,7 @@ class PostgresStorageBucketElement(BaseStorageBucketElement[VALUE]):
 
     # endregion
 
-    async def _get_current_model_instance(self, create_if_not_exists: bool = False) -> tortoise.Model | None:
+    async def _get_current_model_instance(self, create_if_not_exists: bool = False, **filters) -> tortoise.Model | None:
         """Get the current model instance."""
         if self._scope == FlowScopes.USER:
             param_name = "user_id"
@@ -316,32 +316,32 @@ class PostgresStorageBucketElement(BaseStorageBucketElement[VALUE]):
         else:
             raise NotImplementedError(f"Unknown scope: {self._scope}")
 
-        model_instance = await self.model.get_or_none(**{param_name: param_value})
+        model_instance = await self.model.get_or_none(**{param_name: param_value, **filters})
 
         if model_instance is None and create_if_not_exists:
-            model_instance = await self.model.create(**{param_name: param_value})
+            model_instance = await self.model.create(**{param_name: param_value, **filters})
 
         return model_instance
 
-    async def get_data(self, default: VALUE | None = None) -> VALUE | None:
+    async def get_data(self, default: VALUE | None = None, **filters) -> VALUE | None:
         """Get the data for the storage element."""
-        model_instance = await self._get_current_model_instance()
+        model_instance = await self._get_current_model_instance(**filters)
 
         if model_instance is None:
             return default
 
         return getattr(model_instance, self.field_name, default) or default
 
-    async def set_data(self, data: VALUE):
+    async def set_data(self, data: VALUE, **filters):
         """Set the data for the storage element."""
-        model_instance = await self._get_current_model_instance(create_if_not_exists=True)
+        model_instance = await self._get_current_model_instance(create_if_not_exists=True, **filters)
 
         setattr(model_instance, self.field_name, data)
         await model_instance.save()
 
-    async def delete_data(self):
+    async def delete_data(self, **filters):
         """Delete the data for the storage element."""
-        model_instance = await self._get_current_model_instance()
+        model_instance = await self._get_current_model_instance(**filters)
 
         if model_instance is not None:
             setattr(model_instance, self.field_name, None)
@@ -485,10 +485,10 @@ class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBuck
     _model: tortoise.Model
 
     @classmethod
-    async def empty(cls):
+    async def empty(cls, **filters):
         flow_connector = FlowConnector.get_current()
 
-        await cls._model.filter(user_id=flow_connector.user.id).delete()
+        await cls._model.filter(user_id=flow_connector.user.id, **filters).delete()
 
     # _tortoise_meta: tortoise.models.ModelMeta
 
@@ -536,20 +536,6 @@ class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBuck
     #             if name in cls._meta.m2m_fields
     #         ],
     #     }
-
-
-class BaseAssistantsStorageBucket(BaseStorageBucket, ABC):
-    """Base storage bucket for the `GPTAssistantStep`s."""
-
-    __abstract = True  # pylint: disable=W0238
-
-    thread_id: StorageBucketElement[str]
-
-
-class BasePostgresAssistantsStorageBucket(BasePostgresStorageBucket, BaseAssistantsStorageBucket):
-    """Base storage bucket for the `GPTAssistantStep`s."""
-
-    __abstract = True  # pylint: disable=W0238
 
 
 # endregion
