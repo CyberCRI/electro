@@ -11,7 +11,7 @@ from PIL import Image
 from .enums import ResponseTypes, SupportedPlatforms
 from .flow_connector import FlowConnectorEvents
 from .flow_manager import global_flow_manager
-from .models import Button, Channel, File, Guild, Message, Role, User
+from .models import Button, Channel, File, Message, User
 from .schemas import ButtonClick, ReceivedMessage
 from .settings import settings
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
@@ -83,18 +83,6 @@ class BaseInterface(ABC):
             "type": channel.type,
             "platform_ids": {
                 identifier.platform: identifier.platform_id for identifier in await channel.platform_ids.all()
-            },
-        }
-
-    async def _format_guild(self, guild: Optional[Guild]) -> Dict[str, Any]:
-        """Format the guild to be sent to the client."""
-        if not guild:
-            return None
-        return {
-            "id": guild.id,
-            "name": guild.name,
-            "platform_ids": {
-                identifier.platform: identifier.platform_id for identifier in await guild.platform_ids.all()
             },
         }
 
@@ -234,44 +222,6 @@ class BaseInterface(ABC):
             }
         )
 
-    async def add_role(self, user: User, role: Role):
-        """
-        Assign a role to a user.
-
-        Arguments:
-            user: The user to whom the role will be assigned.
-            role: The role to be assigned to the user.
-        """
-        await self.send_json(
-            {
-                "action": ResponseTypes.ADD_ROLE,
-                "content": {
-                    "role": role.name,
-                    "guild": await self._format_guild(role.guild),
-                    "user": await self._format_user(user),
-                },
-            }
-        )
-
-    async def remove_role(self, user: User, role: Role):
-        """
-        Remove a role from a user.
-
-        Arguments:
-            user: The user from whom the role will be removed.
-            role: The role to be removed from the user.
-        """
-        await self.send_json(
-            {
-                "action": ResponseTypes.REMOVE_ROLE,
-                "content": {
-                    "role": role.name,
-                    "guild": await self._format_guild(role.guild),
-                    "user": await self._format_user(user),
-                },
-            }
-        )
-
     async def set_typing(self, user: User, channel: Channel, action: ResponseTypes):
         """
         Set the typing indicator for a user or a channel.
@@ -316,6 +266,25 @@ class BaseInterface(ABC):
             {
                 "action": ResponseTypes.FINISH_FLOW,
                 "content": {},
+            }
+        )
+
+    async def custom_action(self, user: User, channel: Channel, action: str, content: Dict[str, Any]):
+        """
+        Send a custom action to the client.
+
+        Arguments:
+            action: The action to be sent.
+            content: The content of the action.
+        """
+        await self.send_json(
+            {
+                "action": action,
+                "content": {
+                    "user": await self._format_user(user),
+                    "channel": await self._format_channel(channel),
+                    "data": content,
+                },
             }
         )
 

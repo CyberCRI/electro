@@ -5,15 +5,9 @@ class PlatformId(BaseModel):
     id: str
 
 
-class Guild(BaseModel):
-    platform_id: PlatformId
-    name: str
-
-
 class Channel(BaseModel):
     platform_id: PlatformId
     name: str
-    guild: Guild | None
     type: str
 
 

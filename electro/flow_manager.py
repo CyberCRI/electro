@@ -10,7 +10,7 @@ from ._common import ContextInstanceMixin
 from .exceptions import DisabledButtonClick, EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
-from .models import Button, Channel, Guild, Message, PlatformId, User, UserStateChanged
+from .models import Button, Channel, Message, PlatformId, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
 from .storage import BaseFlowStorage, ChannelData, FlowRedisStorage, UserData
@@ -33,19 +33,6 @@ class AnalyticsManager(ContextInstanceMixin):
         self.set_current(self)
 
     @classmethod
-    async def get_or_create_guild(cls, platform: str, guild_data: schemas.Guild) -> Guild:
-        """Save the guild to the database."""
-        platform_id, created = await PlatformId.get_or_create(
-            platform_id=guild_data.platform_id.id, platform=platform, type=PlatformId.PlatformIdTypes.GUILD
-        )
-        if created:
-            guild = await Guild.create(name=guild_data.name)
-            platform_id.guild = guild
-            logger.info(f"Created the Guild record for {guild.id=}, {guild.name=}")
-            await platform_id.save()
-        return await platform_id.guild
-
-    @classmethod
     async def get_or_create_channel(
         cls, platform: str, channel_data: schemas.Channel, user: typing.Optional[User] = None
     ) -> Channel:
@@ -61,11 +48,6 @@ class AnalyticsManager(ContextInstanceMixin):
             platform_id.channel = channel
             logger.info(f"Created the Channel record for {channel.id=}, {channel.name=}")
             await platform_id.save()
-        if channel_data.guild:
-            logger.error(f"{channel_data=}, {channel_data.guild=}")
-            guild = await cls.get_or_create_guild(platform, channel_data.guild)
-            channel.guild = guild
-            await channel.save()
         channel = await platform_id.channel
         if user and channel.type == Channel.ChannelTypes.DM:
             if not user.dm_channel:
@@ -247,7 +229,6 @@ class FlowManager(ContextInstanceMixin):
             scope = FlowScopes.CHANNEL
         else:
             scope = FlowScopes.USER
-        # TODO: [17.05.2024 by Mykola] Allow for `FlowScopes.GUILD` flows
 
         # Check whether this event has triggered any of the flows
         for flow in self.flows:
@@ -404,61 +385,6 @@ class FlowManager(ContextInstanceMixin):
         )
 
         return await self.dispatch(flow_connector)
-
-    # async def on_member_join(self, member: types.Member):
-    #     """Handle the `member_join` event."""
-    #     # Save the user to the database
-    #     await self.analytics_manager.save_new_member(member)
-
-    #     # Get the user state and data
-    #     logger.info(f"Getting the user state and data for {member.id}")
-    #     # TODO: [22.08.2023 by Mykola] Use correct types here
-    #     user_state = await self._get_user_state(member)
-    #     user_data = await self._get_user_data(member)
-
-    #     # noinspection PyProtectedMember
-    #     flow_connector = FlowConnector(
-    #         flow_manager=self,
-    #         event=FlowConnectorEvents.MEMBER_JOIN,
-    #         user=member._user,
-    #         member=member,
-    #         # TODO: [28.08.2023 by Mykola] Use the correct channel here
-    #         channel=member.guild.system_channel,
-    #         message=None,
-    #         user_state=user_state,
-    #         user_data=user_data,
-    #         channel_state=None,
-    #         channel_data=ChannelData(),
-    #     )
-
-    #     return await self.dispatch(flow_connector)
-
-    # async def on_member_update(self, before: types.Member, after: types.Member):
-    #     """Handle the `member_update` event."""
-    #     # Save the member update record to the database
-    #     await self.analytics_manager.save_updated_member(before, after)
-
-    #     # Get the user state and data
-    #     logger.info(f"Getting the user state and data for {after.id}")
-    #     user_state = await self._get_user_state(after)
-    #     user_data = await self._get_user_data(after)
-
-    #     # noinspection PyProtectedMember
-    #     flow_connector = FlowConnector(
-    #         flow_manager=self,
-    #         event=FlowConnectorEvents.MEMBER_UPDATE,
-    #         user=after._user,
-    #         member=after,
-    #         channel=after.guild.system_channel,
-    #         message=None,
-    #         user_state=user_state,
-    #         user_data=user_data,
-    #         extra_data={"old_member": before},
-    #         channel_state=None,
-    #         channel_data=ChannelData(),
-    #     )
-
-    #     return await self.dispatch(flow_connector)
 
     # region Context Manager
     async def __aenter__(self):

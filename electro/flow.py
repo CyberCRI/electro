@@ -93,8 +93,6 @@ class BaseFlow(ABC, metaclass=FlowMeta):
                 return connector.user_state
             case FlowScopes.CHANNEL:
                 return connector.channel_state
-            # case FlowScopes.GUILD:
-            #     return connector.guild_state
             case _:
                 raise ValueError(f"Unknown scope: {self._scope}. Supported scopes: {FlowScopes.__members__}")
 
@@ -105,8 +103,6 @@ class BaseFlow(ABC, metaclass=FlowMeta):
                 connector.user_state = state
             case FlowScopes.CHANNEL:
                 connector.channel_state = state
-            # case FlowScopes.GUILD:
-            #     connector.guild_state = state
             case _:
                 raise ValueError(f"Unknown scope: {self._scope}. Supported scopes: {FlowScopes.__members__}")
 
