@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     # Locales settings
     LOCALES_PATH: str = "locales"  # Relative to the current working directory
     DEFAULT_LOCALE: str = "en"
+    SUPPORTED_LOCALES: list[str] = ["en", "fr"]
 
     # Database settings
     DATABASE_URL: PostgresDsn | None = None
