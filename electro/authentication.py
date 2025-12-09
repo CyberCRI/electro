@@ -48,6 +48,20 @@ class ElectroAuthentication:
         return await cls._jwt_authenticate_user(platform, authorization)
 
     @classmethod
+    async def authenticate_admin(
+        cls,
+        platform: str,
+        user_id: str,
+        header: Optional[str] = Header(default=None, alias="Authorization"),
+        cookie: Optional[str] = Cookie(default=None, alias="IKIGAI_AUTHORIZATION"),
+    ) -> User:
+        """Authenticate an admin user."""
+        user = await cls.authenticate_user(platform, user_id, header, cookie)
+        if not user.is_admin:
+            raise HTTPException(status_code=403, detail="User does not have admin privileges.")
+        return user
+
+    @classmethod
     async def _get_or_create_user(cls, platform: str, user_id: str, username: Optional[str] = None) -> User:
         """Get or create a user based on the platform and user ID."""
         platform_id, created = await PlatformId.get_or_create(
