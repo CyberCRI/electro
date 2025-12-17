@@ -4,7 +4,7 @@ from string import Template
 from electro.settings import settings
 
 translations = {
-    locale: gettext.translation("messages", localedir=settings.LOCALES_PATH, languages=[locale])
+    locale: gettext.translation("messages", localedir=settings.LOCALES_PATH, languages=[locale], fallback=True)
     for locale in settings.SUPPORTED_LOCALES
 }
 
