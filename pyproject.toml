@@ -20,7 +20,7 @@ dependencies = [
     "aioboto3>=13.1.1,<14",
     "azure-storage-blob>=12.23.1,<13",
     "azure-identity>=1.18.0,<2",
-    "fastapi[standard]>=0.115.5,<0.116",
+    "fastapi[standard]>=0.115.5,<1.0.0",
 ]
 
 [dependency-groups]
