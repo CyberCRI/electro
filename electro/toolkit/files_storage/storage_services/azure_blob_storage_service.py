@@ -44,8 +44,13 @@ class AzureBlobStorageService(BaseStorageService):
             except ResourceNotFoundError:
                 await container_client.create_container()
 
-    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
-        """Upload an file to the Azure Blob Storage."""
+    async def upload_file(self, file_io: BytesIO, content_type: str, *, make_public: bool = False) -> str:
+        """Upload a file to the Azure Blob Storage.
+
+        Note: make_public is accepted for API consistency but Azure blob public access
+        is controlled at the container level. Use SAS tokens via get_file_url() for access.
+        """
+        _ = make_public  # Azure public access is container-level, not per-blob
         blob_name = f"file_{os.urandom(8).hex()}.png"
         async with await self.blob_service_client as client:
             await self._ensure_container_exists()

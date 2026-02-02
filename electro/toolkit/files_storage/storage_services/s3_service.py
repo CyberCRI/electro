@@ -63,17 +63,23 @@ class S3Service(BaseStorageService):
 
             return destination
 
-    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
+    async def upload_file(self, file_io: BytesIO, content_type: str, *, make_public: bool = False) -> str:
         """Uploads an file to the S3 bucket and returns the object key.
 
         :param file_io: BytesIO object of the file to upload
+        :param content_type: MIME type of the file
+        :param make_public: If True, set ACL to public-read for public access
         :return: object key of the uploaded file
 
         """
         object_key = str(uuid4())
+        extra_args = {"ContentType": content_type}
+
+        if make_public:
+            extra_args["ACL"] = "public-read"
+
         try:
-            # TODO: [2024-10-05 by Mykola] IT'S NOT ALWAYS JPEG
-            await self._upload_file(file_io, object_key, extra_args={"ContentType": content_type})
+            await self._upload_file(file_io, object_key, extra_args=extra_args)
             logger.info(f"File uploaded successfully: {object_key}")
             return object_key
         except Exception as e:

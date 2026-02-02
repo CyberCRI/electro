@@ -8,10 +8,12 @@ class BaseStorageService(ABC):
     """Base class for storage services."""
 
     @abstractmethod
-    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
-        """Uploads an file to the storage and returns the object key.
+    async def upload_file(self, file_io: BytesIO, content_type: str, *, make_public: bool = False) -> str:
+        """Uploads a file to the storage and returns the object key.
 
         :param file_io: BytesIO object of the file to upload
+        :param content_type: MIME type of the file
+        :param make_public: If True, make the file publicly accessible (S3: sets ACL to public-read)
         :return: object key of the uploaded file
 
         """

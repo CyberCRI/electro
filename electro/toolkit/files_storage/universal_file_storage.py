@@ -17,9 +17,9 @@ class UniversalFileStorage:
         """Initialize the UniversalFileStorage class."""
         self.storage_service = storage_service
 
-    async def upload_file(self, file_io: BytesIO, content_type: str) -> str:
+    async def upload_file(self, file_io: BytesIO, content_type: str, *, make_public: bool = False) -> str:
         """Upload an file to the storage service."""
-        return await self.storage_service.upload_file(file_io, content_type)
+        return await self.storage_service.upload_file(file_io, content_type, make_public=make_public)
 
     async def download_file(self, object_key: str) -> BytesIO:
         """Download an file from the storage service."""
