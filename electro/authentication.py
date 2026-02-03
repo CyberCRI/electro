@@ -17,8 +17,8 @@ class ElectroAuthentication:
     @classmethod
     async def authenticate_user(
         cls,
-        platform: str,
-        user_id: str,
+        platform: str = SupportedPlatforms.CUSTOM.value,
+        user_id: Optional[str] = None,
         header: Optional[str] = Header(default=None, alias="Authorization"),
         cookie: Optional[str] = Cookie(default=None, alias="IKIGAI_AUTHORIZATION"),
     ) -> User:
@@ -44,14 +44,16 @@ class ElectroAuthentication:
             authorization = authorization.split(" ")[1]
 
         if authentication_method == "api_key":
+            if not user_id:
+                raise HTTPException(status_code=400, detail="user_id is required for API key authentication.")
             return await cls._api_key_authenticate_user(platform, user_id, authorization)
         return await cls._jwt_authenticate_user(platform, authorization)
 
     @classmethod
     async def authenticate_admin(
         cls,
-        platform: str,
-        user_id: str,
+        platform: str = SupportedPlatforms.CUSTOM.value,
+        user_id: Optional[str] = None,
         header: Optional[str] = Header(default=None, alias="Authorization"),
         cookie: Optional[str] = Cookie(default=None, alias="IKIGAI_AUTHORIZATION"),
     ) -> User:
