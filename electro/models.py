@@ -71,6 +71,8 @@ class User(BaseModel):
 
     id = fields.BigIntField(pk=True)
     username = fields.CharField(max_length=255)
+    first_name = fields.CharField(max_length=255, null=True)
+    last_name = fields.CharField(max_length=255, null=True)
     locale = fields.CharField(max_length=255, default=settings.DEFAULT_LOCALE)
     is_admin = fields.BooleanField(default=False)
 
