@@ -27,11 +27,10 @@ class StorageSubstitution(BaseSubstitution):
         self,
         data_factory: typing.Callable[[], typing.Awaitable[VALUE | None]],
         index: int | None = None,
-        *args,
         **kwargs,
     ):
         """Initialize the Storage Substitution."""
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.data_factory = data_factory
         self.index = index
@@ -104,14 +103,14 @@ class BaseStorageBucketElement(Generic[VALUE], ABC):
     """The class for storage elements."""
 
     _type: type[VALUE]
-
     _scope: FlowScopes
+    _storage_data: StorageData[VALUE] | None
 
     def __init__(self, *, _type: type[VALUE], _scope: FlowScopes = FlowScopes.USER, **__):
         """Initialize the storage element. Called by the metaclass."""
-
         self._type = _type
         self._scope = _scope
+        self._storage_data = None
 
     @staticmethod
     async def get_current_user_id() -> int:
@@ -165,28 +164,25 @@ class BaseStorageBucketElement(Generic[VALUE], ABC):
         """Get the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._get_user_data(default=default)
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._get_channel_data(default=default)
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def set_data(self, data: VALUE):
         """Set the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._set_user_data(data)
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._set_channel_data(data)
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def delete_data(self):
         """Delete the data for the storage element."""
         if self._scope == FlowScopes.USER:
             return await self._delete_user_data()
-        elif self._scope == FlowScopes.CHANNEL:
+        if self._scope == FlowScopes.CHANNEL:
             return await self._delete_channel_data()
-        else:
-            raise NotImplementedError(f"Unknown scope: {self._scope}")
+        raise NotImplementedError(f"Unknown scope: {self._scope}")
 
     async def __aenter__(self) -> VALUE:
         """Get the data for the storage element."""
@@ -309,7 +305,7 @@ class PostgresStorageBucketElement(BaseStorageBucketElement[VALUE]):
 
     # endregion
 
-    async def _get_current_model_instance(self, create_if_not_exists: bool = False) -> tortoise.Model | None:
+    async def _get_current_model_instance(self, create_if_not_exists: bool = False, **filters) -> tortoise.Model | None:
         """Get the current model instance."""
         if self._scope == FlowScopes.USER:
             param_name = "user_id"
@@ -320,32 +316,32 @@ class PostgresStorageBucketElement(BaseStorageBucketElement[VALUE]):
         else:
             raise NotImplementedError(f"Unknown scope: {self._scope}")
 
-        model_instance = await self.model.get_or_none(**{param_name: param_value})
+        model_instance = await self.model.get_or_none(**{param_name: param_value, **filters})
 
         if model_instance is None and create_if_not_exists:
-            model_instance = await self.model.create(**{param_name: param_value})
+            model_instance = await self.model.create(**{param_name: param_value, **filters})
 
         return model_instance
 
-    async def get_data(self, default: VALUE | None = None) -> VALUE | None:
+    async def get_data(self, default: VALUE | None = None, **filters) -> VALUE | None:
         """Get the data for the storage element."""
-        model_instance = await self._get_current_model_instance()
+        model_instance = await self._get_current_model_instance(**filters)
 
         if model_instance is None:
             return default
 
         return getattr(model_instance, self.field_name, default) or default
 
-    async def set_data(self, data: VALUE):
+    async def set_data(self, data: VALUE, **filters):
         """Set the data for the storage element."""
-        model_instance = await self._get_current_model_instance(create_if_not_exists=True)
+        model_instance = await self._get_current_model_instance(create_if_not_exists=True, **filters)
 
         setattr(model_instance, self.field_name, data)
         await model_instance.save()
 
-    async def delete_data(self):
+    async def delete_data(self, **filters):
         """Delete the data for the storage element."""
-        model_instance = await self._get_current_model_instance()
+        model_instance = await self._get_current_model_instance(**filters)
 
         if model_instance is not None:
             setattr(model_instance, self.field_name, None)
@@ -455,6 +451,8 @@ class PostgresStorageBucketMeta(StorageBucketMeta):
 
         # Set the storage elements from annotations
         for attr_name, attr_type in (merged_bases_annotations | cls.__annotations__).items():
+            resolved_annotations = typing.get_type_hints(cls)
+            attr_type = resolved_annotations.get(attr_name, attr_type)
             if (not attr_name.startswith("_")) and issubclass(get_origin(attr_type), BaseStorageBucketElement):
                 element_class: Type[PostgresStorageBucketElement] = (
                     PostgresStorageBucketElement
@@ -482,15 +480,15 @@ class PostgresStorageBucketMeta(StorageBucketMeta):
 class BasePostgresStorageBucket(BaseStorageBucket, metaclass=PostgresStorageBucketMeta):
     """The base class for Postgres storage buckets."""
 
-    __abstract = True
+    __abstract = True  # pylint: disable=W0238
 
     _model: tortoise.Model
 
     @classmethod
-    async def empty(cls):
+    async def empty(cls, **filters):
         flow_connector = FlowConnector.get_current()
 
-        await cls._model.filter(user_id=flow_connector.user.id).delete()
+        await cls._model.filter(user_id=flow_connector.user.id, **filters).delete()
 
     # _tortoise_meta: tortoise.models.ModelMeta
 

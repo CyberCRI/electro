@@ -29,37 +29,28 @@ migrate:
 	poetry run aerich upgrade
 
 
-# region Locales management with Poeditor
 # TODO: [2024-07-20 by Mykola] Use `$(SOURCES_DIR)` instead of `.` in the commands below.
+
 .PHONY: extract-locales
 extract-locales:
-	poetry run pybabel extract --input-dirs . --output ./locales/messages.pot
+	poetry run pybabel --quiet extract --input-dirs . --output ./locales/messages.pot
+
+.PHONY: locales
+locales:
+	$(MAKE) extract-locales
+	poetry run pybabel update --input-file ./locales/messages.pot --output-dir ./locales/
 
 .PHONY: compile-locales
 compile-locales:
-	poetry run pybabel compile --directory ./locales/
-
-.PHONY: download-translations
-download-translations:
-	@./scripts/download_translations_from_poeditor.sh $(POEDITOR__API_TOKEN) $(POEDITOR__PROJECT_ID) $(SOURCES_DIR)
-
-.PHONY: upload-translations
-upload-translations:
-	@./scripts/upload_translations_to_poeditor.sh $(POEDITOR__API_TOKEN) $(POEDITOR__PROJECT_ID) $(SOURCES_DIR)
-
-.PHONY: upload-locales
-upload-locales: extract-locales upload-translations
-
-.PHONY: update-locales
-update-locales: download-translations compile-locales
+	poetry run pybabel compile -f --directory ./locales/
 
 # endregion
 
 
 .PHONY: pre-start
 pre-start:
-	make migrate
-	make update-locales
+	${MAKE} migrate
+	${MAKE} compile-locales
 
 .PHONY: start
 start:

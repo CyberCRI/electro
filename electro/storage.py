@@ -9,93 +9,90 @@ You can think of it like this: if Storage Bucket is an SQL table, then Storage i
 
 from __future__ import annotations
 
-import typing
+import json
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
-from .toolkit import redis_storage
+from redis.asyncio import Redis
 
-DEFAULT_FLOW_STORAGE_PREFIX = "flow::"
+from .settings import settings
+
+DEFAULT_FLOW_STORAGE_PREFIX = "flow"
 DEFAULT_MISSING_ADDRESS_PART = "missing"
 
 
 class BaseData(dict):
     """The base class for the data."""
 
-    pass
-
 
 class UserData(BaseData):
     """The data for a user."""
 
-    pass
-
 
 class ChannelData(BaseData):
     """The data for a channel."""
-
-    pass
 
 
 class BaseFlowStorage(ABC):
     """The base class for the storage."""
 
     @abstractmethod
-    async def get_user_state(self, user_id: int) -> str | None:
+    async def get_user_state(self, user_id: int, flow_code: str) -> str | None:
         """Get the state for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_channel_state(self, channel_id: int) -> str | None:
+    async def get_channel_state(self, channel_id: int, flow_code: str) -> str | None:
         """Get the state for a channel."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_user_state(self, user_id: int, state: str | None):
+    async def set_user_state(self, user_id: int, flow_code: str, state: str | None):
         """Set the state for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_channel_state(self, channel_id: int, state: str | None):
+    async def set_channel_state(self, channel_id: int, flow_code: str, state: str | None):
         """Set the state for a channel."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_user_state(self, user_id: int):
+    async def delete_user_state(self, user_id: int, flow_code: str):
         """Delete the state for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_channel_state(self, channel_id: int):
+    async def delete_channel_state(self, channel_id: int, flow_code: str):
         """Delete the state for a channel."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_user_data(self, user_id: int) -> UserData:
+    async def get_user_data(self, user_id: int, flow_code: str) -> UserData:
         """Get the data for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def get_channel_data(self, channel_id: int) -> ChannelData:
+    async def get_channel_data(self, channel_id: int, flow_code: str) -> ChannelData:
         """Get the data for a channel."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
+    async def set_user_data(self, user_id: int, flow_code: str, data: UserData | dict[str, Any] | None):
         """Set the data for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
+    async def set_channel_data(self, channel_id: int, flow_code: str, data: ChannelData | dict[str, Any] | None):
         """Set the data for a channel."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_user_data(self, user_id: int):
+    async def delete_user_data(self, user_id: int, flow_code: str):
         """Delete the data for a user."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete_channel_data(self, channel_id: int):
+    async def delete_channel_data(self, channel_id: int, flow_code: str):
         """Delete the data for a channel."""
         raise NotImplementedError
 
@@ -110,71 +107,77 @@ class FlowMemoryStorage(BaseFlowStorage):
     """The storage used for `Flow`. Stores data for all the users."""
 
     def __init__(self):
-        self._user_states: dict[int, str] = {}
-        self._user_data: dict[int, UserData] = {}
+        self._user_states: dict[str, str] = {}
+        self._user_data: dict[str, UserData] = {}
 
-        self._channel_states: dict[int, str] = {}
-        self._channel_data: dict[int, ChannelData] = {}
+        self._channel_states: dict[str, str] = {}
+        self._channel_data: dict[str, ChannelData] = {}
 
-    async def get_user_state(self, user_id: int) -> str | None:
+    def _get_key(self, object_id: int, flow_code: str) -> str:
+        """Get the key for the object."""
+        return f"{flow_code}:{object_id}"
+
+    async def get_user_state(self, user_id: int, flow_code: str) -> str | None:
         """Get the state for a user."""
-        return self._user_states.get(user_id)
+        return self._user_states.get(self._get_key(user_id, flow_code))
 
-    async def get_channel_state(self, channel_id: int) -> str | None:
+    async def get_channel_state(self, channel_id: int, flow_code: str) -> str | None:
         """Get the state for a channel."""
-        return self._channel_states.get(channel_id)
+        return self._channel_states.get(self._get_key(channel_id, flow_code))
 
-    async def set_user_state(self, user_id: int, state: str | None):
+    async def set_user_state(self, user_id: int, flow_code: str, state: str | None):
         """Set the state for a user."""
-        self._user_states[user_id] = state
+        self._user_states[self._get_key(user_id, flow_code)] = state
 
-    async def set_channel_state(self, channel_id: int, state: str | None):
+    async def set_channel_state(self, channel_id: int, flow_code: str, state: str | None):
         """Set the state for a channel."""
-        self._channel_states[channel_id] = state
+        self._channel_states[self._get_key(channel_id, flow_code)] = state
 
-    async def delete_user_state(self, user_id: int):
+    async def delete_user_state(self, user_id: int, flow_code: str):
         """Delete the state for a user."""
-        if user_id in self._user_states:
-            del self._user_states[user_id]
+        if self._get_key(user_id, flow_code) in self._user_states:
+            del self._user_states[self._get_key(user_id, flow_code)]
 
-    async def delete_channel_state(self, channel_id: int):
+    async def delete_channel_state(self, channel_id: int, flow_code: str):
         """Delete the state for a channel."""
-        if channel_id in self._channel_states:
-            del self._channel_states[channel_id]
+        if self._get_key(channel_id, flow_code) in self._channel_states:
+            del self._channel_states[self._get_key(channel_id, flow_code)]
 
-    async def get_user_data(self, user_id: int) -> UserData:
+    async def get_user_data(self, user_id: int, flow_code: str) -> UserData:
         """Get the data for a user."""
-        if user_id not in self._user_data:
-            self._user_data[user_id] = UserData()
+        if self._get_key(user_id, flow_code) not in self._user_data:
+            self._user_data[self._get_key(user_id, flow_code)] = UserData()
 
-        return self._user_data[user_id]
+        return self._user_data[self._get_key(user_id, flow_code)]
 
-    async def get_channel_data(self, channel_id: int) -> ChannelData:
+    async def get_channel_data(self, channel_id: int, flow_code: str) -> ChannelData:
         """Get the data for a channel."""
-        if channel_id not in self._channel_data:
-            self._channel_data[channel_id] = ChannelData()
+        if self._get_key(channel_id, flow_code) not in self._channel_data:
+            self._channel_data[self._get_key(channel_id, flow_code)] = ChannelData()
 
-        return self._channel_data[channel_id]
+        return self._channel_data[self._get_key(channel_id, flow_code)]
 
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
+    async def set_user_data(self, user_id: int, flow_code: str, data: UserData | dict[str, Any] | None):
         """Set the data for a user."""
-        self._user_data[user_id] = data if isinstance(data, UserData) else UserData(**data) if data else UserData()
+        self._user_data[self._get_key(user_id, flow_code)] = (
+            data if isinstance(data, UserData) else UserData(**data) if data else UserData()
+        )
 
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
+    async def set_channel_data(self, channel_id: int, flow_code: str, data: ChannelData | dict[str, Any] | None):
         """Set the data for a channel."""
-        self._channel_data[channel_id] = (
+        self._channel_data[self._get_key(channel_id, flow_code)] = (
             data if isinstance(data, ChannelData) else ChannelData(**data) if data else ChannelData()
         )
 
-    async def delete_user_data(self, user_id: int):
+    async def delete_user_data(self, user_id: int, flow_code: str):
         """Delete the data for a user."""
-        if user_id in self._user_data:
-            del self._user_data[user_id]
+        if self._get_key(user_id, flow_code) in self._user_data:
+            del self._user_data[self._get_key(user_id, flow_code)]
 
-    async def delete_channel_data(self, channel_id: int):
+    async def delete_channel_data(self, channel_id: int, flow_code: str):
         """Delete the data for a channel."""
-        if channel_id in self._channel_data:
-            del self._channel_data[channel_id]
+        if self._get_key(channel_id, flow_code) in self._channel_data:
+            del self._channel_data[self._get_key(channel_id, flow_code)]
 
     async def clear(self):
         """Clear the storage."""
@@ -187,70 +190,100 @@ class FlowMemoryStorage(BaseFlowStorage):
 class FlowRedisStorage(BaseFlowStorage):
     """The storage used for `Flow`. Stores data for all the users in Redis."""
 
-    _redis_storage: redis_storage.RedisStorage
-    _flow_storage_prefix: str
-
-    _missing_address_part: str
-
     def __init__(
         self,
-        storage: redis_storage.RedisStorage,
-        flow_storage_prefix: str = DEFAULT_FLOW_STORAGE_PREFIX,
-        missing_address_part: str = DEFAULT_MISSING_ADDRESS_PART,
+        host: str = settings.REDIS_HOST,
+        port: int = settings.REDIS_PORT,
+        db: int = settings.REDIS_DB,
+        password: Optional[str] = settings.REDIS_PASSWORD,
+        prefix: str = DEFAULT_FLOW_STORAGE_PREFIX,
+        state_ttl: Optional[int] = settings.FLOW_STORAGE_STATE_TTL,
+        data_ttl: Optional[int] = settings.FLOW_STORAGE_DATA_TTL,
     ):
-        self._redis_storage = storage
+        self._redis = Redis(
+            host=host,
+            port=port,
+            db=db,
+            password=password,
+            decode_responses=True,
+        )
+        self._prefix = prefix
+        self._state_ttl = state_ttl
+        self._data_ttl = data_ttl
 
-        self._flow_storage_prefix = flow_storage_prefix
-        self._missing_address_part = missing_address_part
+    def _user_state_key(self, user_id: int, flow_code: str) -> str:
+        return f"{self._prefix}:user:{user_id}:state:{flow_code}"
 
-    async def get_user_state(self, user_id: int) -> str | None:
-        """Get the state for a user."""
-        return await self._redis_storage.get_state(chat=self._missing_address_part, user=user_id)
+    def _user_data_key(self, user_id: int, flow_code: str) -> str:
+        return f"{self._prefix}:user:{user_id}:data:{flow_code}"
 
-    async def get_channel_state(self, channel_id: int) -> str | None:
-        """Get the state for a channel."""
-        return await self._redis_storage.get_state(chat=channel_id, user=self._missing_address_part)
+    def _channel_state_key(self, channel_id: int, flow_code: str) -> str:
+        return f"{self._prefix}:channel:{channel_id}:state:{flow_code}"
 
-    async def set_user_state(self, user_id: int, state: str | None):
-        """Set the state for a user."""
-        await self._redis_storage.set_state(chat=self._missing_address_part, user=user_id, state=state)
+    def _channel_data_key(self, channel_id: int, flow_code: str) -> str:
+        return f"{self._prefix}:channel:{channel_id}:data:{flow_code}"
 
-    async def set_channel_state(self, channel_id: int, state: str | None):
-        """Set the state for a channel."""
-        await self._redis_storage.set_state(chat=channel_id, user=self._missing_address_part, state=state)
+    async def get_user_state(self, user_id: int, flow_code: str) -> str | None:
+        return await self._redis.get(self._user_state_key(user_id, flow_code))
 
-    async def delete_user_state(self, user_id: int):
-        """Delete the state for a user."""
-        await self._redis_storage.set_state(chat=self._missing_address_part, user=user_id, state=None)
+    async def get_channel_state(self, channel_id: int, flow_code: str) -> str | None:
+        return await self._redis.get(self._channel_state_key(channel_id, flow_code))
 
-    async def delete_channel_state(self, channel_id: int):
-        """Delete the state for a channel."""
-        await self._redis_storage.set_state(chat=channel_id, user=self._missing_address_part, state=None)
+    async def set_user_state(self, user_id: int, flow_code: str, state: str | None):
+        key = self._user_state_key(user_id, flow_code)
+        if state is None:
+            await self._redis.delete(key)
+        else:
+            await self._redis.set(key, state, ex=self._state_ttl)
 
-    async def get_user_data(self, user_id: int) -> UserData:
-        """Get the data for a user."""
-        return UserData(**await self._redis_storage.get_data(chat=self._missing_address_part, user=user_id))
+    async def set_channel_state(self, channel_id: int, flow_code: str, state: str | None):
+        key = self._channel_state_key(channel_id, flow_code)
+        if state is None:
+            await self._redis.delete(key)
+        else:
+            await self._redis.set(key, state, ex=self._state_ttl)
 
-    async def get_channel_data(self, channel_id: int) -> ChannelData:
-        """Get the data for a channel."""
-        return ChannelData(**await self._redis_storage.get_data(chat=channel_id, user=self._missing_address_part))
+    async def delete_user_state(self, user_id: int, flow_code: str):
+        await self._redis.delete(self._user_state_key(user_id, flow_code))
 
-    async def set_user_data(self, user_id: int, data: UserData | dict[str, typing.Any] | None):
-        """Set the data for a user."""
-        await self._redis_storage.set_data(chat=self._missing_address_part, user=user_id, data=dict(**data))
+    async def delete_channel_state(self, channel_id: int, flow_code: str):
+        await self._redis.delete(self._channel_state_key(channel_id, flow_code))
 
-    async def set_channel_data(self, channel_id: int, data: ChannelData | dict[str, typing.Any] | None):
-        """Set the data for a channel."""
-        await self._redis_storage.set_data(chat=channel_id, user=self._missing_address_part, data=dict(**data))
+    async def get_user_data(self, user_id: int, flow_code: str) -> UserData:
+        raw = await self._redis.get(self._user_data_key(user_id, flow_code))
+        return UserData(**json.loads(raw)) if raw else UserData()
 
-    async def delete_user_data(self, user_id: int):
-        """Delete the data for a user."""
-        await self._redis_storage.set_data(chat=self._missing_address_part, user=user_id, data=None)
+    async def get_channel_data(self, channel_id: int, flow_code: str) -> ChannelData:
+        raw = await self._redis.get(self._channel_data_key(channel_id, flow_code))
+        return ChannelData(**json.loads(raw)) if raw else ChannelData()
 
-    async def delete_channel_data(self, channel_id: int):
-        """Delete the data for a channel."""
-        await self._redis_storage.set_data(chat=channel_id, user=self._missing_address_part, data=None)
+    async def set_user_data(self, user_id: int, flow_code: str, data: UserData | dict[str, Any] | None):
+        key = self._user_data_key(user_id, flow_code)
+        if data:
+            await self._redis.set(key, json.dumps(dict(data)), ex=self._data_ttl)
+        else:
+            await self._redis.delete(key)
+
+    async def set_channel_data(self, channel_id: int, flow_code: str, data: ChannelData | dict[str, Any] | None):
+        key = self._channel_data_key(channel_id, flow_code)
+        if data:
+            await self._redis.set(key, json.dumps(dict(data)), ex=self._data_ttl)
+        else:
+            await self._redis.delete(key)
+
+    async def delete_user_data(self, user_id: int, flow_code: str):
+        await self._redis.delete(self._user_data_key(user_id, flow_code))
+
+    async def delete_channel_data(self, channel_id: int, flow_code: str):
+        await self._redis.delete(self._channel_data_key(channel_id, flow_code))
 
     async def clear(self):
-        """Clear the storage."""
-        await self._redis_storage.reset_all()
+        # WARNING: This will delete all keys with the prefix!
+        keys = []
+        async for key in self._redis.scan_iter(f"{self._prefix}:*"):
+            keys.append(key)
+        if keys:
+            await self._redis.delete(*keys)
+
+    async def close(self):
+        await self._redis.close()

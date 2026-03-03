@@ -5,21 +5,22 @@ from __future__ import annotations
 import typing
 from collections import defaultdict
 
-from . import types_ as types
+from . import schemas
 from ._common import ContextInstanceMixin
-from .bot import bot as global_bot
-from .enums import ChannelType
-from .exceptions import EventCannotBeProcessed
+from .exceptions import DisabledButtonClick, EventCannotBeProcessed
 from .flow import Flow, FlowConnector, FlowFinished
 from .flow_connector import FlowConnectorEvents
-
-# from decorators import fail_safely
-from .models import Channel, Interaction, Message, User, UserStateChanged
+from .models import Button, Channel, Message, PlatformId, User, UserStateChanged
 from .scopes import FlowScopes
 from .settings import settings
-from .storage import BaseFlowStorage, ChannelData, FlowMemoryStorage, UserData
+from .storage import BaseFlowStorage, ChannelData, FlowRedisStorage, UserData
+from .toolkit.decorators import fail_safely, forbid_concurrent_execution
+from .toolkit.i18n import _
 from .toolkit.loguru_logging import logger
 from .toolkit.tortoise_orm import Model
+
+if typing.TYPE_CHECKING:
+    from .interfaces import BaseInterface
 
 
 class AnalyticsManager(ContextInstanceMixin):
@@ -31,131 +32,72 @@ class AnalyticsManager(ContextInstanceMixin):
         # Set the current analytics manager
         self.set_current(self)
 
-    @staticmethod
-    async def save_user(user: types.User, guild: types.Guild | None = None) -> User:
-        """Save the user to the database."""
-        user, created = await User.get_or_create(
-            id=user.id,
-            defaults={
-                "username": user.username,
-                "discriminator": user.discriminator,
-                "avatar": user.avatar.get("url") if user.avatar else None,
-                "guild_id": guild.id if guild else None,
-            },
-        )
-
-        if created:
-            logger.info(f"Created the User record for {user.id=}, {user.username=}, and {user.discriminator}")
-
-        return user
-
-    @staticmethod
-    async def save_channel(channel: types.Channel) -> Channel:
+    @classmethod
+    async def get_or_create_channel(
+        cls, platform: str, channel_data: schemas.Channel, user: typing.Optional[User] = None
+    ) -> Channel:
         """Save the channel to the database."""
-        return await Channel.create(
-            id=channel.id,
-            name=getattr(channel, "name", None),
-            guild_id=channel.guild.id if getattr(channel, "guild", None) else None,
-            type=channel.type,
+        platform_id, created = await PlatformId.get_or_create(
+            platform_id=channel_data.platform_id.id, platform=platform, type=PlatformId.PlatformIdTypes.CHANNEL
         )
+        if created:
+            channel_type = channel_data.type
+            if channel_type not in Channel.ChannelTypes:
+                raise ValueError(f"Invalid channel type: {channel_type}")
+            channel = await Channel.create(name=channel_data.name, type=channel_type)
+            platform_id.channel = channel
+            logger.info(f"Created the Channel record for {channel.id=}, {channel.name=}")
+            await platform_id.save()
+        channel = await platform_id.channel
+        if user and channel.type == Channel.ChannelTypes.DM:
+            if not user.dm_channel:
+                user.dm_channel = channel
+                await user.save()
+                return channel
+            if created:
+                platform_id.channel = user.dm_channel
+                await platform_id.save()
+                await channel.delete()
+                return await platform_id.channel
+        return channel
 
-    async def save_new_member(self, member: types.Member) -> User:
-        """Save the new member to the database."""
-        # noinspection PyProtectedMember
-        user = member._user
-        user_obj = await self.save_user(user, member.guild)
-
-        # TODO: [05.06.2024 by Mykola] Save the new member to the database
-
-        return user_obj
-
-    async def save_updated_member(self, before: types.Member, after: types.Member) -> User:
-        """Save the updated member to the database."""
-        # noinspection PyProtectedMember
-        user = after._user
-        user_obj = await self.save_user(user, after.guild)
-
-        # TODO: [05.06.2024 by Mykola] Save the updated member to the database
-
-        return user_obj
-
-    async def _get_user_obj(self, user: types.User, guild: types.Guild | None = None) -> User:
-        if not (user_obj := await User.get_or_none(id=user.id)):
-            logger.warning(f"User {user.id} not found in the database. Creating the user record.")
-            user_obj: User = await self.save_user(user, guild)
-
-        return user_obj
-
-    async def _get_channel_obj(self, channel: types.Channel) -> Channel:
-        if not (channel_obj := await Channel.get_or_none(id=channel.id)):
-            logger.warning(f"Channel {channel.id} not found in the database. Creating the channel record.")
-            channel_obj: Channel = await self.save_channel(channel)
-
-        return channel_obj
-
-    async def get_or_save_message(self, message: types.Message) -> Message:
+    @classmethod
+    async def save_message(
+        cls, author: User, platform: str, flow_code: str, message_data: schemas.ReceivedMessage
+    ) -> Message:
         """Save the message to the database."""
-        # Get the user and channel objects (make sure they exist in the database)
-        # TODO: [2024-12-23 by Mykola] Add the `.guild` to the `message` object
-        # user_obj = await self._get_user_obj(message.author, message.guild)
-        user_obj = await self._get_user_obj(message.author, None)
-        channel_obj = await self._get_channel_obj(message.channel)
-
-        if message_obj := await Message.get_or_none(id=message.id):
-            return message_obj
-
+        if message_data.channel:
+            channel = await cls.get_or_create_channel(platform, message_data.channel, author)
+        else:
+            channel = None
         return await Message.create(
-            id=message.id,
-            content=message.content,
-            author=user_obj,
-            channel=channel_obj,
-            created_at=message.created_at,
-            edited_at=message.edited_at,
-            # TODO: [2024-12-23 by Mykola] Expand the message model
-            # is_pinned=message.pinned,
-            # is_tts=message.tts,
-            # is_bot_message=message.author.bot,
-            is_command=message.content.startswith(settings.BOT_COMMAND_PREFIX),
+            flow_code=flow_code,
+            is_command=message_data.content.startswith(settings.BOT_COMMAND_PREFIX),
+            is_bot_message=False,
+            user=author,
+            content=message_data.content,
+            channel=channel,
         )
 
-    async def save_interaction(
-        self, interaction: types.Interaction, return_message_obj=False
-    ) -> Interaction | tuple[Interaction, Message]:
-        """Save the interaction to the database."""
-        # Get the user and channel objects (make sure they exist in the database)
-        user_obj = await self._get_user_obj(interaction.user, interaction.guild)
-        channel_obj = await self._get_channel_obj(interaction.channel)
+    @classmethod
+    async def save_button_click(cls, button_id: int) -> Button:
+        """Save the button to the database."""
+        # Get the user and channel objects (make sure they exist in the database
+        button = await Button.get(id=button_id)
+        if button.clicked and button.remove_after_click:
+            raise DisabledButtonClick
+        button.clicked = True
+        await button.save()
+        return button
 
-        message_obj = await self.get_or_save_message(interaction.message)
-
-        interaction_obj: Interaction = await Interaction.create(
-            id=interaction.id,
-            user=user_obj,
-            channel=channel_obj,
-            message=message_obj,
-            custom_id=interaction.data.get("custom_id"),
-        )
-
-        if return_message_obj:
-            return interaction_obj, message_obj
-
-        return interaction_obj
-
+    @classmethod
     async def save_user_state_changed(
-        self, user: types.User, previous_state: str | None, new_state: str | None
+        cls, user: User, previous_state: str | None, new_state: str | None
     ) -> UserStateChanged | None:
         """Save the user state changed record to the database."""
         if previous_state == new_state:
-            return
-
-        # Get the user object (make sure it exists in the database)
-        user_obj = await self._get_user_obj(user)  # TODO: [2024-10-16 by Mykola] Should be pass `guild` here?
-
-        return await UserStateChanged.create(
-            user=user_obj,
-            previous_state=previous_state,
-            new_state=new_state,
-        )
+            return None
+        return await UserStateChanged.create(user=user, previous_state=previous_state, new_state=new_state)
 
 
 class FlowManager(ContextInstanceMixin):
@@ -166,15 +108,13 @@ class FlowManager(ContextInstanceMixin):
 
     def __init__(
         self,
-        bot: types.Bot,
         flows: typing.Optional[list[Flow]] = None,
         storage: typing.Optional[BaseFlowStorage] = None,
         on_finish_callbacks: typing.Optional[list[typing.Callable[[FlowConnector], typing.Awaitable[None]]]] = None,
     ):
-        self.bot = bot
         self.flows: list[Flow] = flows or []
 
-        self.storage = storage or FlowMemoryStorage()
+        self.storage = storage or FlowRedisStorage()
         self.analytics_manager = AnalyticsManager(self)
 
         self._on_finish_callbacks: list[typing.Callable[[FlowConnector], typing.Awaitable[None]]] = (
@@ -185,63 +125,65 @@ class FlowManager(ContextInstanceMixin):
         self.set_current(self)
 
     # region User State and Data management
-    async def _get_user_state(self, user: types.User) -> str | None:
+    async def _get_user_state(self, user: User, flow_code: str) -> str | None:
         """Get the state of the user."""
-        return await self.storage.get_user_state(user.id)
+        return await self.storage.get_user_state(user.id, flow_code)
 
-    async def _set_user_state(self, user: types.User, state: str | None):
+    async def _set_user_state(self, user: User, flow_code: str, state: str | None):
         """Set the state of the user."""
         # Save the state to the database
-        old_state = await self._get_user_state(user)
+        old_state = await self._get_user_state(user, flow_code)
         if old_state != state:
             await self.analytics_manager.save_user_state_changed(user, old_state, state)
-        await self.storage.set_user_state(user.id, state)
+        await self.storage.set_user_state(user.id, flow_code, state)
 
-    async def _delete_user_state(self, user: types.User):
+    async def _delete_user_state(self, user: User, flow_code: str):
         """Delete the state of the user."""
-        old_state = await self._get_user_state(user)
+        old_state = await self._get_user_state(user, flow_code)
         if old_state:
             await self.analytics_manager.save_user_state_changed(user, old_state, None)
-        await self.storage.delete_user_state(user.id)
+        await self.storage.delete_user_state(user.id, flow_code)
 
-    async def _get_user_data(self, user: types.User) -> UserData:
+    async def _get_user_data(self, user: User, flow_code: str) -> UserData:
         """Get the data of the user."""
-        return await self.storage.get_user_data(user.id)
+        return await self.storage.get_user_data(user.id, flow_code)
 
-    async def _set_user_data(self, user: types.User, data: UserData | dict[str, typing.Any] | None):
+    async def _set_user_data(self, user: User, flow_code: str, data: UserData | dict[str, typing.Any] | None):
         """Set the data of the user."""
-        await self.storage.set_user_data(user.id, data)
+        await self.storage.set_user_data(user.id, flow_code, data)
 
-    async def _delete_user_data(self, user: types.User):
+    async def _delete_user_data(self, user: User, flow_code: str):
         """Delete the data of the user."""
-        await self.storage.delete_user_data(user.id)
+        await self.storage.delete_user_data(user.id, flow_code)
 
     # endregion
 
     # region Channel State and Data management
-    async def _get_channel_state(self, channel: types.Channel) -> str | None:
+    async def _get_channel_state(self, channel: Channel, flow_code: str) -> str | None:
         """Get the state of the channel."""
-        return await self.storage.get_channel_state(channel.id)
+        return await self.storage.get_channel_state(channel.id, flow_code)
 
-    async def _set_channel_state(self, channel: types.Channel, state: str | None):
+    async def _set_channel_state(self, channel: Channel, flow_code: str, state: str | None):
         """Set the state of the channel."""
-        await self.storage.set_channel_state(channel.id, state)
+        await self.storage.set_channel_state(channel.id, flow_code, state)
 
-    async def _delete_channel_state(self, channel: types.Channel):
+    async def _delete_channel_state(self, channel: Channel, flow_code: str):
         """Delete the state of the channel."""
-        await self.storage.delete_channel_state(channel.id)
+        await self.storage.delete_channel_state(channel.id, flow_code)
 
-    async def _get_channel_data(self, channel: types.Channel) -> ChannelData:
+    async def _get_channel_data(self, channel: Channel, flow_code: str) -> ChannelData:
         """Get the data of the channel."""
-        return await self.storage.get_channel_data(channel.id)
+        return await self.storage.get_channel_data(channel.id, flow_code)
 
-    async def _set_channel_data(self, channel: types.Channel, data: ChannelData | dict[str, typing.Any] | None):
+    async def _set_channel_data(
+        self, channel: Channel, flow_code: str, data: ChannelData | dict[str, typing.Any] | None
+    ):
         """Set the data of the channel."""
-        await self.storage.set_channel_data(channel.id, data)
+        await self.storage.set_channel_data(channel.id, flow_code, data)
 
-    async def _delete_channel_data(self, channel: types.Channel):
+    async def _delete_channel_data(self, channel: Channel, flow_code: str):
         """Delete the data of the channel."""
-        await self.storage.delete_channel_data(channel.id)
+        await self.storage.delete_channel_data(channel.id, flow_code)
 
     # endregion
 
@@ -267,103 +209,55 @@ class FlowManager(ContextInstanceMixin):
     async def _finish_flow(self, flow_connector: FlowConnector):
         """Finish the flow."""
         # Delete the state and data for the user
-        await self.storage.delete_user_state(flow_connector.user.id)
-        await self.storage.delete_user_data(flow_connector.user.id)
+        await self.storage.delete_user_state(flow_connector.user.id, flow_connector.flow_code)
+        await self.storage.delete_user_data(flow_connector.user.id, flow_connector.flow_code)
 
         # Run the callbacks
         for callback in self._on_finish_callbacks:
             await callback(flow_connector)
+        await flow_connector.interface.finish_flow()
+        return
 
-    async def _create_user_and_channel(
-        self, user: types.User | None = None, channel: types.Channel | types.DMChannel | None = None
-    ):
-        """Create the `User` and `Channel` records if they don't exist."""
-        logger.info(f"Creating the User and Channel records for {user=}, {channel=}")
-
-        user_id = getattr(user, "id", None) if user else None
-        channel_id = getattr(channel, "id", None) if channel else None
-
-        logger.debug(f"Creating the User and Channel records for {user_id=} and {channel_id=}")
-
-        if user and not user_id:
-            logger.warning(f"Failed to get the user ID: {user=}, {channel=}, {channel_id=}")
-
-        if channel and not channel_id:
-            logger.warning(f"Failed to get the channel ID: {channel=}, {user=}, {user_id=}")
-
-        # Create the User record
-        if user_id and not await self._storage__user_model.get_or_none(id=user_id):
-            await self._storage__user_model.create(
-                id=user_id,
-                username=user.name,
-                discriminator=user.discriminator,
-                avatar=user.avatar.url if user.avatar else None,
-            )
-            logger.info(
-                f"Created the User record for {user_id=}, "
-                f"{getattr(user, 'name')=}, and {getattr(user, 'display_name')=}"
-            )
-
-        # Create the Channel record
-        if channel_id and not await self._storage__channel_model.get_or_none(id=channel_id):
-            await self._storage__channel_model.create(
-                id=channel_id,
-                name=getattr(channel, "name", None),
-                guild_id=getattr(getattr(channel, "guild", None), "id", None),
-                type=channel.type,
-            )
-
-            logger.info(
-                f"Created the Channel record for {channel_id=}, "
-                f"{getattr(channel, 'name', None)=}, {getattr(channel, 'type')=}"
-            )
-
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @fail_safely
-    async def _dispatch(self, flow_connector: FlowConnector) -> list[types.MessageToSend] | None:
+    # TODO: This is too complex and should be refactored.  pylint: disable=R0912
+    @fail_safely
+    @forbid_concurrent_execution()
+    async def _dispatch(self, flow_connector: FlowConnector):
         """Dispatch the flow."""
+
         # Create the User and Channel records if they don't exist
-        await self._create_user_and_channel(flow_connector.user, flow_connector.channel)
-
-        is_dm_channel = flow_connector.channel and flow_connector.channel.type == ChannelType.private
-
-        if is_dm_channel:
-            scope = FlowScopes.USER
-        else:
+        if flow_connector.channel and flow_connector.channel.type == Channel.ChannelTypes.CHANNEL:
             scope = FlowScopes.CHANNEL
-        # TODO: [17.05.2024 by Mykola] Allow for `FlowScopes.GUILD` flows
+        else:
+            scope = FlowScopes.USER
 
         # Check whether this event has triggered any of the flows
         for flow in self.flows:
             # Check all the triggers
             if await flow.check_triggers(flow_connector, scope=scope):
-                return await flow.run(flow_connector)
-                # break
-
+                await flow.run(flow_connector)
+                break
         else:
             # Check if it's not something that shouldn't be handled by the flows
             if (
                 flow_connector.event == FlowConnectorEvents.MESSAGE
                 and flow_connector.message.content
-                and flow_connector.message.content.startswith(flow_connector.bot.command_prefix)
+                and flow_connector.message.content.startswith(settings.BOT_COMMAND_PREFIX)
             ):
                 if scope == FlowScopes.USER:
                     # Remove user's state, so that the user wouldn't resume any flow
-                    await self.storage.delete_user_state(flow_connector.user.id)
+                    await self.storage.delete_user_state(flow_connector.user.id, flow_connector.flow_code)
 
                     raise EventCannotBeProcessed(
                         f"The message is a command that is not handled by any of the flows: "
                         f"{flow_connector.message.content}"
                     )
-                else:
-                    logger.warning(
-                        "Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows",
-                        scope=scope,
-                        flow_connector=flow_connector,
-                    )
-                    raise EventCannotBeProcessed(
-                        f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
-                    )
+
+                logger.warning(
+                    f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
+                )
+                raise EventCannotBeProcessed(
+                    f"Out-of-scope `{scope}` command `{flow_connector.message.content}` is not handled by the flows"
+                )
 
             # Get all the flows that can be run:
             # Check if the flow can be run (maybe the user is in the middle of the flow)
@@ -377,10 +271,10 @@ class FlowManager(ContextInstanceMixin):
                 flows_by_scope = defaultdict(list)
                 for flow in flows_that_can_be_run:
                     # noinspection PyProtectedMember
-                    flows_by_scope[flow._scope].append(flow)
+                    flows_by_scope[flow._scope].append(flow)  # pylint: disable=W0212
 
                 # If it's not a private channel, Channel-scoped flows get the priority
-                if flow_connector.channel.type != types.ChannelType.private and (
+                if flow_connector.channel.type == Channel.ChannelTypes.CHANNEL and (
                     channel_scope_flows := flows_by_scope.get(FlowScopes.CHANNEL)
                 ):
                     flows_that_can_be_run = channel_scope_flows
@@ -399,19 +293,18 @@ class FlowManager(ContextInstanceMixin):
                 if scope == FlowScopes.USER:
                     if flow_connector.event == FlowConnectorEvents.MESSAGE:
                         return await self._finish_flow(flow_connector)
-
                     logger.warning(f"Received an event that cannot be processed: {flow_connector.event}")
                     raise EventCannotBeProcessed(f"Received an event that cannot be processed: {flow_connector.event}")
-                else:
-                    logger.debug(
-                        "Out-of-scope `{scope}` event cannot be processed: "
-                        "`{flow_connector.event}` in `#{flow_connector.channel}`",
-                        scope=scope,
-                        flow_connector=flow_connector,
-                    )
-                    return  # Do not raise an exception, as it's not an error
 
-    async def dispatch(self, flow_connector: FlowConnector) -> list[types.MessageToSend] | None:
+                logger.debug(
+                    "Out-of-scope `{scope}` event cannot be processed: "
+                    "`{flow_connector.event}` in `#{flow_connector.channel}`",
+                    scope=scope,
+                    flow_connector=flow_connector,
+                )
+                return  # Do not raise an exception, as it's not an error
+
+    async def dispatch(self, flow_connector: FlowConnector):
         """Dispatch the flow."""
         # Set the current flow connector
         FlowConnector.set_current(flow_connector)
@@ -419,130 +312,76 @@ class FlowManager(ContextInstanceMixin):
         async with self:
             return await self._dispatch(flow_connector)
 
-    async def on_message(self, message: types.Message) -> list[Message] | None:
+    async def on_message(
+        self, user: User, platform: str, flow_code: str, message_data: schemas.ReceivedMessage, interface: BaseInterface
+    ):
         """Handle the messages sent by the users."""
 
         # Save the message to the database
-        message_obj: Message = await self.analytics_manager.get_or_save_message(message)
-
-        # Ignore the messages sent by the bots
-        if message.author.bot:
-            return None
+        message = await self.analytics_manager.save_message(user, platform, flow_code, message_data)
+        channel = await message.channel
 
         # Get the user state and data
         # TODO: [20.08.2023 by Mykola] Use context manager for this
-        logger.info(f"Getting the user state and data for {message.author.id}")
-        user_state = await self._get_user_state(message.author)
-        user_data = await self._get_user_data(message.author)
+        user_state = await self._get_user_state(user, flow_code)
+        user_data = await self._get_user_data(user, flow_code)
 
         # Get the channel state and data
-        channel_state = await self._get_channel_state(message.channel)
-        channel_data = await self._get_channel_data(message.channel)
+        if channel:
+            channel_state = await self._get_channel_state(message.channel, flow_code)
+            channel_data = await self._get_channel_data(message.channel, flow_code)
+        else:
+            channel_state = None
+            channel_data = ChannelData()
 
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.MESSAGE,
-            user=message.author,
-            channel=message.channel,
+            flow_code=flow_code,
+            user=user,
+            channel=channel,
             message=message,
-            message_obj=message_obj,
             user_state=user_state,
             user_data=user_data,
             channel_state=channel_state,
             channel_data=channel_data,
+            interface=interface,
         )
 
         return await self.dispatch(flow_connector)
 
-    async def on_interaction(self, interaction: types.Interaction):
-        """Handle the interactions sent by the users."""
-        # Save the interaction to the database
-        interaction_obj, message_obj = await self.analytics_manager.save_interaction(
-            interaction, return_message_obj=True
-        )
+    async def on_button_click(
+        self, user: User, platform: str, flow_code: str, button_data: schemas.ButtonClick, interface: BaseInterface
+    ):
+        """Handle the buttons clicked by the users."""
+        # Save the button click to the database
+        channel = await self.analytics_manager.get_or_create_channel(platform, button_data.channel, user)
+        try:
+            button = await self.analytics_manager.save_button_click(button_data.id)
+        except DisabledButtonClick:
+            return await interface.send_message(_("buttons.already_clicked"), user, channel)
 
         # Get the user state and data
-        logger.info(f"Getting the user state and data for {interaction.user.id}")
-        user_state = await self._get_user_state(interaction.user)
-        user_data = await self._get_user_data(interaction.user)
+        user_state = await self._get_user_state(user, flow_code)
+        user_data = await self._get_user_data(user, flow_code)
 
         # Get the channel state and data
-        channel_state = await self._get_channel_state(interaction.message.channel)
-        channel_data = await self._get_channel_data(interaction.message.channel)
+        channel_state = await self._get_channel_state(channel, flow_code)
+        channel_data = await self._get_channel_data(channel, flow_code)
 
         # noinspection PyTypeChecker
         flow_connector = FlowConnector(
             flow_manager=self,
-            bot=self.bot,
             event=FlowConnectorEvents.BUTTON_CLICK,
-            user=interaction.user,
-            channel=interaction.channel,
+            flow_code=flow_code,
+            user=user,
+            channel=channel,
+            button=button,
             user_state=user_state,
             user_data=user_data,
-            message=interaction.message,
-            interaction=interaction,
-            message_obj=message_obj,
-            interaction_obj=interaction_obj,
             channel_state=channel_state,
             channel_data=channel_data,
-        )
-
-        return await self.dispatch(flow_connector)
-
-    async def on_member_join(self, member: types.Member):
-        """Handle the `member_join` event."""
-        # Save the user to the database
-        await self.analytics_manager.save_new_member(member)
-
-        # Get the user state and data
-        logger.info(f"Getting the user state and data for {member.id}")
-        # TODO: [22.08.2023 by Mykola] Use correct types here
-        user_state = await self._get_user_state(member)
-        user_data = await self._get_user_data(member)
-
-        # noinspection PyProtectedMember
-        flow_connector = FlowConnector(
-            flow_manager=self,
-            bot=self.bot,
-            event=FlowConnectorEvents.MEMBER_JOIN,
-            user=member._user,
-            member=member,
-            # TODO: [28.08.2023 by Mykola] Use the correct channel here
-            channel=member.guild.system_channel,
-            message=None,
-            user_state=user_state,
-            user_data=user_data,
-            channel_state=None,
-            channel_data=ChannelData(),
-        )
-
-        return await self.dispatch(flow_connector)
-
-    async def on_member_update(self, before: types.Member, after: types.Member):
-        """Handle the `member_update` event."""
-        # Save the member update record to the database
-        await self.analytics_manager.save_updated_member(before, after)
-
-        # Get the user state and data
-        logger.info(f"Getting the user state and data for {after.id}")
-        user_state = await self._get_user_state(after)
-        user_data = await self._get_user_data(after)
-
-        # noinspection PyProtectedMember
-        flow_connector = FlowConnector(
-            flow_manager=self,
-            bot=self.bot,
-            event=FlowConnectorEvents.MEMBER_UPDATE,
-            user=after._user,
-            member=after,
-            channel=after.guild.system_channel,
-            message=None,
-            user_state=user_state,
-            user_data=user_data,
-            extra_data={"old_member": before},
-            channel_state=None,
-            channel_data=ChannelData(),
+            interface=interface,
         )
 
         return await self.dispatch(flow_connector)
@@ -558,17 +397,17 @@ class FlowManager(ContextInstanceMixin):
 
         # After the flow step(s) is/are run, update the user state and data
         if flow_connector.user:
-            await self._set_user_state(flow_connector.user, flow_connector.user_state)
-            await self._set_user_data(flow_connector.user, flow_connector.user_data)
+            await self._set_user_state(flow_connector.user, flow_connector.flow_code, flow_connector.user_state)
+            await self._set_user_data(flow_connector.user, flow_connector.flow_code, flow_connector.user_data)
 
         # Also, update the channel state and data
         if flow_connector.channel:
-            await self._set_channel_state(flow_connector.channel, flow_connector.channel_state)
-            await self._set_channel_data(flow_connector.channel, flow_connector.channel_data)
+            await self._set_channel_state(
+                flow_connector.channel, flow_connector.flow_code, flow_connector.channel_state
+            )
+            await self._set_channel_data(flow_connector.channel, flow_connector.flow_code, flow_connector.channel_data)
 
     # endregion
 
 
-global_flow_manager = FlowManager(
-    bot=global_bot,
-)
+global_flow_manager = FlowManager()

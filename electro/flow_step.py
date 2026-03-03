@@ -8,31 +8,27 @@ import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from io import BytesIO
 
-import discord
-from openai import NOT_GIVEN
+from openai import AsyncOpenAI, NOT_GIVEN
 
 from .contrib.storage_buckets import BaseStorageBucketElement, StorageBucketElement
-from .contrib.views import BaseView, ViewStepFinished
 from .flow_connector import FlowConnectorEvents
-
-# from decorators import with_constant_typing
+from .models import Channel, File
 from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
+from .toolkit.decorators import with_constant_typing
+from .toolkit.files_storage.universal_file_storage import universal_file_storage
+from .toolkit.i18n import resolve_translation, TranslatedString
 from .toolkit.loguru_logging import logger
-from .toolkit.openai_client import async_openai_client
-from .toolkit.templated_i18n import TemplatedString
-from .types_ import Channel, MessageToSend
 
 if typing.TYPE_CHECKING:
+    from .contrib.buttons import ActionButton
     from .flow import FlowConnector
 
 
 class FlowStepDone(Exception):
     """The exception that is raised when the `BaseFlowStep` is finished."""
-
-    pass
 
 
 class BaseFlowStep(ABC):
@@ -44,7 +40,7 @@ class BaseFlowStep(ABC):
     _testing: bool = False
 
     @abstractmethod
-    async def run(self, connector: FlowConnector) -> list[MessageToSend] | None:
+    async def run(self, connector: FlowConnector):
         """Run the `BaseFlowStep`. Called when the `BaseFlowStep` is started."""
         raise NotImplementedError
 
@@ -59,13 +55,15 @@ class MessageFormatterMixin:
 
     substitutions: dict[str, str] | None = None
 
-    async def _get_formatted_message(self, message: TemplatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString | str, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
+        if not isinstance(message, TranslatedString):
+            return message or ""
         generic_substitutions: dict[str, str | int | BaseSubstitution] = (
             connector.user_data | (connector.substitutions or {}) | (self.substitutions or {}) | kwargs
         )
 
-        variables_used_in_message = message.get_identifiers()
+        variables_used_in_message = message.get_identifiers(connector.user.locale)
         logger.debug(
             f"Variables used in the message: {variables_used_in_message}, {generic_substitutions=}, {message=}"
         )
@@ -80,35 +78,41 @@ class MessageFormatterMixin:
             if key in variables_used_in_message
         }
 
-        return message.safe_substitute(
-            **substitutions,
-        )
+        return resolve_translation(message.safe_substitute(**substitutions), connector.user.locale)
 
 
 @dataclass(kw_only=True)
 class FilesMixin:
-    file: discord.File | typing.BinaryIO | pathlib.Path | BaseSubstitution | None = None
-    files: list[discord.File | typing.BinaryIO | pathlib.Path | BaseSubstitution] | None = None
+    files: list[File | typing.BinaryIO | BaseSubstitution] | None = None
 
-    async def _get_files_to_send(self, connector: FlowConnector) -> list[discord.File]:
+    async def _get_files_to_send(self, connector: FlowConnector) -> list[File]:
         """Get the files to send."""
-        if self.file and self.files:
-            # TODO: [18.11.2023 by Mykola] Use `overload` to type-hint prohibit both `file` and `files` at the same time
-            raise ValueError("You can't specify both `file` and `files`.")
-
         # Resolve the files if they are `BaseSubstitution`s
-        files: list[discord.File | typing.BinaryIO | pathlib.Path | None] = [
+        return [
             await file.resolve(connector) if file and isinstance(file, BaseSubstitution) else file
-            for file in (self.files or ([self.file] if self.file else []))
+            for file in self.files or []
         ]
 
-        # Convert the files to `discord.File`s if they are not
-        files = [file if isinstance(file, discord.File) else (discord.File(file) if file else None) for file in files]
 
-        # Remove the `None`s
-        files = [file for file in files if file]
+class StorageMixin(ABC):
+    answers_storage: StorageBucketElement | None = None
 
-        return files
+    async def _get_user_answer(self) -> typing.Any:
+        """Get the user answer."""
+        if self.answers_storage is not None:
+            async with self.answers_storage as answers_storage:
+                return answers_storage.get()
+
+    async def _set_user_answer(self, user_answer: typing.Any):
+        """Set the user answer."""
+        if self.answers_storage is not None:
+            async with self.answers_storage as answers_storage:
+                answers_storage.set(user_answer)
+
+    async def clear_storage(self) -> None:
+        """Clear the storage."""
+        if self.answers_storage is not None:
+            await self.answers_storage.delete_data()
 
 
 class CallbackHandlerStep(BaseFlowStep):
@@ -133,8 +137,7 @@ class CallbackHandlerStep(BaseFlowStep):
 
         self._step = None
 
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @with_constant_typing()
+    @with_constant_typing()
     async def run(self, connector: FlowConnector):
         try:
             result = await self.callback(connector)
@@ -146,13 +149,11 @@ class CallbackHandlerStep(BaseFlowStep):
 
                 # Run the `BaseFlowStep`
                 await result.run(connector)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=W0718
             if self.skip_on_failure:
                 logger.exception(e)
-
                 raise FlowStepDone() from e
-            else:
-                raise e
+            raise e
 
         if self.non_blocking:
             raise FlowStepDone()
@@ -197,22 +198,23 @@ def callback_handler(
 class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     """The class for `MessageFlowStep`."""
 
-    message: TemplatedString | None = None
-    response_message: TemplatedString | None = None
+    message: TranslatedString | None = None
+    response_message: TranslatedString | None = None
 
-    channel_to_send_to: discord.abc.Messageable | BaseSubstitution | GlobalAbstractChannel | None = None
+    channel_to_send_to: Channel | BaseSubstitution | GlobalAbstractChannel | None = None
 
     substitutions: dict[str, str] | None = None
 
-    view: BaseView | None = None
+    buttons: typing.List[ActionButton] | None = None
 
     validator: typing.Callable[[str], bool] | None = None
-    validator_error_message: TemplatedString | None = None
+    validator_error_message: TranslatedString | None = None
 
     # TODO: [27.09.2023 by Mykola] Make this automatic, on the `Flow` level
     save_response_to_storage: StorageBucketElement | None = None
 
     non_blocking: bool = False
+    delete_after: int | None = None
     _testing: bool = False
 
     @staticmethod
@@ -222,10 +224,8 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     ) -> Channel:
         if not channel_to_send_to:
             return connector.channel
-
         if isinstance(channel_to_send_to, BaseSubstitution):
             return await channel_to_send_to.resolve(connector)
-
         if isinstance(channel_to_send_to, GlobalAbstractChannel):
             return await resolve_channel(channel_to_send_to, connector.user)
 
@@ -234,77 +234,61 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
     async def send_message(
         self,
         connector: FlowConnector,
-        message: TemplatedString | str,
-        channel: discord.abc.Messageable | BaseSubstitution[discord.abc.Messageable] | None = None,
-        view: BaseView | None = None,
-    ) -> MessageToSend:
+        message: TranslatedString | str,
+        channel: Channel | BaseSubstitution[Channel] | None = None,
+        buttons: typing.Optional[typing.List[ActionButton]] = None,
+    ):
         """Send the message."""
-        message: str | None = (
-            await self._get_formatted_message(message, connector) if isinstance(message, TemplatedString) else message
-        )
+        message = await self._get_formatted_message(message, connector)
+        channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
+        files = await self._get_files_to_send(connector)
+        await connector.interface.send_message(message, connector.user, channel_to_send_to, files, buttons)
 
-        # files = await self._get_files_to_send(connector)
-
-        channel_to_send_to: Channel = await self._resolve_channel_to_send_to(
-            channel or self.channel_to_send_to, connector
-        )
-
-        # view_to_sent = await view.get_or_create_for_connector(connector, from_step_run=True) if view else None
-
-        return MessageToSend(
-            content=message,
-            channel=channel_to_send_to,
-            # files=files or None,
-            # view=view_to_sent,
-        )
-
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @with_constant_typing()
+    @with_constant_typing()
     async def run(
         self,
         connector: FlowConnector,
         channel_to_send_to: Channel | BaseSubstitution | None = None,
-    ) -> list[MessageToSend] | None:
+    ):
         """Run the `BaseFlowStep`."""
-
-        message: MessageToSend = await self.send_message(
-            connector, self.message, channel=channel_to_send_to or connector.channel, view=self.view
+        await self.send_message(
+            connector,
+            self.message,
+            buttons=self.buttons,
+            channel=channel_to_send_to or connector.channel,
         )
-
         if self.non_blocking:
             await self.respond(connector)
-
             raise FlowStepDone()
 
-        # TODO: [2025-03-03 by Mykola] Allow sending multiple messages
-        return [message]
-
-    async def respond(self, connector: FlowConnector) -> discord.Message:
+    async def respond(self, connector: FlowConnector):
         """Respond to the user."""
         if self.response_message:
             return await self.send_message(connector, self.response_message, channel=connector.channel)
 
     async def process_response(self, connector: FlowConnector):
         """Process the response. If the `.response_message` is set, send it."""
-        if self.view and connector.event == FlowConnectorEvents.BUTTON_CLICK and connector.interaction:
-            try:
-                view_for_connector = await self.view.get_or_create_for_connector(connector)
-                return await view_for_connector.process_interaction(connector)
-            except ViewStepFinished:
-                pass
+        if self.buttons and connector.event == FlowConnectorEvents.BUTTON_CLICK:
+            button = [b for b in self.buttons if b.custom_id == connector.button.custom_id]
+            if len(button) > 1:
+                logger.error(
+                    f"Multiple buttons with the same custom id {connector.button.custom_id} in {self.buttons=}"
+                )
+                return
+            if not button:
+                logger.error(f"Cannot find the button with custom id {connector.button.custom_id} in {self.buttons=}")
+                return
+            return await button[0].trigger_action(connector)
 
         # TODO: [23.11.2023 by Mykola] Use Whisper to transcribe the audio message into text
-
         if self.validator:
             if not self.validator(connector.message.content):
-                error_message = (
+                message = (
                     await self._get_formatted_message(self.validator_error_message, connector)
                     if self.validator_error_message
                     else "Invalid input."
                 )
-
-                await connector.channel.send(error_message)
-                return
+                return await connector.interface.send_message(message, connector.user, connector.channel)
 
         if self.save_response_to_storage:
             await self.save_response_to_storage.set_data(connector.message.content)
@@ -317,8 +301,8 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
 class DirectMessageFlowStep(MessageFlowStep):
     """The same as `MessageFlowStep`, but sends the message to the user's DMs."""
 
-    async def run(self, connector: FlowConnector, channel_to_send_to: discord.abc.Messageable | None = None):
-        if not channel_to_send_to and not isinstance(connector.channel, discord.DMChannel):
+    async def run(self, connector: FlowConnector, channel_to_send_to: Channel | None = None):
+        if not channel_to_send_to:
             channel_to_send_to = GlobalAbstractChannel.DM_CHANNEL
 
         return await super().run(connector, channel_to_send_to=channel_to_send_to)
@@ -328,28 +312,46 @@ class DirectMessageFlowStep(MessageFlowStep):
 class SendImageFlowStep(MessageFlowStep):
     """The Step that sends an image."""
 
-    language: str | None = None
+    file: File | pathlib.Path | BytesIO | str | None = None
+    caption: str = ""
 
     force_blocking_step: bool = False
 
-    def __post_init__(self):
+    def get_translated_image(self, locale: str) -> str | None:
         """Post-initialization."""
         # If the user doesn't want to force the blocking step, set the `non_blocking` flag to `True`
         if not self.force_blocking_step:
             self.non_blocking = True
 
         # If the language is set, try to use the language-specific file
-        if self.language:
-            language = self.language.lower()
-            language_specific_file = self.file.with_stem(f"{self.file.stem}__{language}")
-
-            if language_specific_file.exists():
-                self.file = language_specific_file
-            else:
+        if isinstance(self.file, pathlib.Path):
+            file, extention = str(self.file).rsplit(".", 1)
+            language_specific_file = f"{file}__{locale}.{extention}"
+            try:
+                with open(language_specific_file, "rb"):
+                    return language_specific_file
+            except FileNotFoundError:
                 logger.warning(
                     f"In step {self.__class__.__name__}: "
                     f"Language-specific file {language_specific_file} does not exist. Using the default."
                 )
+        return None
+
+    async def send_message(
+        self,
+        connector: FlowConnector,
+        message: TranslatedString | str,
+        channel: Channel | BaseSubstitution[Channel] | None = None,
+        buttons: typing.Optional[typing.List[ActionButton]] = None,
+    ):
+        """Send the message."""
+        translated_image = self.get_translated_image(connector.user.locale)
+        file = translated_image or self.file
+        message = await self._get_formatted_message(message, connector)
+        channel_to_send_to = await self._resolve_channel_to_send_to(channel or self.channel_to_send_to, connector)
+        await connector.interface.send_message(
+            self.caption, connector.user, channel_to_send_to, [file], buttons=buttons
+        )
 
 
 # TODO: [26.09.2023 by Mykola] Move to a separate file
@@ -367,6 +369,8 @@ class ChatGPTMixin:
     @staticmethod
     async def get_response_from_chat_gpt(
         prompt: str,
+        openai_client: AsyncOpenAI,
+        chat_completion_model: str,
         system_message: str | None = None,
         response_format: ChatGPTResponseFormat = ChatGPTResponseFormat.AUTO,
     ) -> str:
@@ -402,8 +406,8 @@ class ChatGPTMixin:
             )
         )
 
-        completion = await async_openai_client.chat.completions.create(
-            model=settings.OPENAI_CHAT_COMPLETION_MODEL, messages=completion_messages, response_format=response_format
+        completion = await openai_client.chat.completions.create(
+            model=chat_completion_model, messages=completion_messages, response_format=response_format
         )
 
         message = completion.choices[0].message
@@ -416,24 +420,29 @@ class ChatGPTMixin:
 class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
     """The Step that gets the response from the ChatGPT API for sending a message."""
 
-    message_prompt: TemplatedString | None = None
-    response_message_prompt: TemplatedString | None = None
+    openai_client: AsyncOpenAI | None = None
+    chat_completion_model: str | None = None
+
+    message_prompt: TranslatedString | None = None
+    response_message_prompt: TranslatedString | None = None
 
     response_format: ChatGPTResponseFormat | str = ChatGPTResponseFormat.AUTO
 
     save_prompt_response_to_storage: StorageBucketElement | None = None
     parse_json_before_saving: bool | None = None
 
-    async def _get_formatted_message(self, message: TemplatedString, connector: FlowConnector, **kwargs) -> str:
+    async def _get_formatted_message(self, message: TranslatedString | str, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
         if not self.message_prompt:
             return await super()._get_formatted_message(message, connector, **kwargs)
 
         # Send the typing indicator
-        await connector.channel.trigger_typing()
+        # await connector.interface.set_typing(connector.user, connector.channel, action=ResponseTypes.START_TYPING)
 
         prompt_response = await self.get_response_from_chat_gpt(
             await super()._get_formatted_message(self.message_prompt, connector, **kwargs),
+            self.openai_client,
+            self.chat_completion_model,
             response_format=self.response_format,
         )
 
@@ -447,7 +456,7 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
                 and self.response_format == ChatGPTResponseFormat.JSON_OBJECT
             ):
                 try:
-                    response_to_save: Any = json.loads(prompt_response)
+                    response_to_save: typing.Any = json.loads(prompt_response)
                     logger.debug(f"Parsed the `{self.__class__.__name__}` JSON response: {response_to_save=}")
                 except json.JSONDecodeError:
                     logger.exception(
@@ -458,3 +467,72 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
             await self.save_prompt_response_to_storage.set_data(response_to_save)
 
         return await super()._get_formatted_message(message, connector, prompt_response=prompt_response, **kwargs)
+
+
+@dataclass
+class AcceptFileStep(MessageFlowStep):
+    """Accept a file from the user."""
+
+    storage_to_save_file_url_to: BaseStorageBucketElement | None = None
+    storage_to_save_file_object_id_to: BaseStorageBucketElement | None = None
+
+    storage_to_save_saved_file_id_to: BaseStorageBucketElement | None = None
+
+    file_is_required_message: TranslatedString | str = "You need to upload a file."
+    file_saved_confirmation_message: TranslatedString | str | None = None
+
+    allow_skip: bool = False
+
+    def __post_init__(self):
+        if self.storage_to_save_file_url_to is None:
+            raise ValueError("`storage_to_save_file_url_to` is required!")
+
+    async def process_response(self, connector: FlowConnector):
+        """Process the response."""
+        if not connector.message.attachments:
+            if self.allow_skip:
+                return await super().process_response(connector)
+
+            return await self.send_message(connector, self.file_is_required_message)
+
+        # Get the first attachment
+        attachment = connector.message.attachments[0]
+
+        # Save the file URL
+        if self.storage_to_save_file_url_to:
+            await self.storage_to_save_file_url_to.set_data(attachment.url)
+            logger.info(f"Saved the file URL: {attachment.url=}")
+
+        # Save the File
+        if self.storage_to_save_file_object_id_to or self.storage_to_save_saved_file_id_to:
+            file_io = BytesIO(await attachment.read())
+            content_type = attachment.content_type
+            file_object_key = await universal_file_storage.upload_file(file_io, content_type)
+
+            if self.storage_to_save_file_object_id_to:
+                # Save the file object key
+                await self.storage_to_save_file_object_id_to.set_data(file_object_key)
+
+                logger.info(f"Saved the file object key: {file_object_key=}")
+
+            if self.storage_to_save_saved_file_id_to:
+                # Create the `File` object
+                try:
+                    file = await File.create(
+                        added_by_user_id=connector.user.id,
+                        storage_service=settings.STORAGE_SERVICE_ID,
+                        storage_file_object_key=file_object_key,
+                        file_name=attachment.filename,
+                    )
+
+                except Exception as exception:  # pylint: disable=W0718
+                    logger.error(f"Failed to save the file: {exception}")
+                    return await self.send_message(connector, "Failed to save the file.")
+
+                # Save the file ID
+                await self.storage_to_save_saved_file_id_to.set_data(file.pk)
+
+        if self.file_saved_confirmation_message:
+            await self.send_message(connector, self.file_saved_confirmation_message)
+
+        return await super().process_response(connector)

@@ -20,18 +20,17 @@ redis = "^5.0.7"
 tortoise-orm = {extras = ["asyncpg"], version = "^0.21.5"}
 aerich = "^0.7.2"
 tenacity = "^8.5.0"
-py-cord = {git = "https://github.com/mykolasolodukha/pycord.git", rev = "d8070a90a8ec12dbc64b703513c14fa80834861d"}
 aioboto3 = "^13.1.1"
 azure-storage-blob = "^12.23.1"
 azure-identity = "^1.18.0"
-fastapi = {extras = ["standard"], version = "^0.115.5"}
+fastapi = {extras = ["standard"], version = ">=0.115.5,<1.0.0"}
+pillow = "^11.2.1"
 
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
 isort = "^5.13.2"
 pylint = "^3.2.6"
-pydocstyle = {extras = ["toml"], version = "^6.3.0"}
 sphinx = "^8.2.0"
 sphinx-rtd-theme = "^3.0.2"
 autodoc-pydantic = "^2.2.0"
@@ -58,9 +57,6 @@ max-line-length = 120  # the maximum length of a line
 disable = ["fixme"]  # ignore TODOs and FIXMEs
 source-roots = ["electro"]  # the source roots for pylint to check
 ignore-patterns = ["tests", "migrations"]  # ignore the tests and migrations folders
-
-[tool.pydocstyle]
-match-dir = "(?!tests|migrations).*"  # exclude the tests and migrations folders
 
 
 [tool.aerich]

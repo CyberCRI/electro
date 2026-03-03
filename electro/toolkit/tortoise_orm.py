@@ -40,17 +40,15 @@ class ModelMeta(tortoise_ModelMeta):
 class Model(tortoise_Model, metaclass=ModelMeta):
     """The base `tortoise-orm` `Model`."""
 
-    pass
-
 
 def get_tortoise_config():
     """Get the configuration for the `tortoise-orm`."""
-    if not (database_url := str(settings.DATABASE_URL)):
+    if not (database_url := settings.DATABASE_URL):
         database_url = (
             f"postgres://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@"
             f"{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
-    db = expand_db_url(database_url)
+    db = expand_db_url(str(database_url))
     ctx = False
     if settings.ENABLE_DATABASE_SSL:
         ctx = ssl.create_default_context(cafile="")

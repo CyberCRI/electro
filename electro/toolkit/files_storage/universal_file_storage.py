@@ -6,24 +6,28 @@ from .storage_services import AzureBlobStorageService, BaseStorageService, S3Ser
 from .storages_enums import StoragesIDs
 
 
-class UniversalImageStorage:
+class UniversalFileStorage:
     """
-    The UniversalImageStorage class is responsible for uploading and downloading images to and from a storage service.
+    The UniversalFileStorage class is responsible for uploading and downloading files to and from a storage service.
 
     It can be used with any storage service that implements the BaseStorageService class.
     """
 
     def __init__(self, storage_service: BaseStorageService):
-        """Initialize the UniversalImageStorage class."""
+        """Initialize the UniversalFileStorage class."""
         self.storage_service = storage_service
 
-    async def upload_image(self, image_io: BytesIO) -> str:
-        """Upload an image to the storage service."""
-        return await self.storage_service.upload_image(image_io)
+    async def upload_file(self, file_io: BytesIO, content_type: str, *, make_public: bool = False) -> str:
+        """Upload an file to the storage service."""
+        return await self.storage_service.upload_file(file_io, content_type, make_public=make_public)
 
-    async def download_image(self, object_key: str) -> BytesIO:
-        """Download an image from the storage service."""
-        return await self.storage_service.download_image(object_key)
+    async def download_file(self, object_key: str) -> BytesIO:
+        """Download an file from the storage service."""
+        return await self.storage_service.download_file(object_key)
+
+    async def get_file_url(self, object_key: str) -> str:
+        """Get the URL of the file from the storage service."""
+        return await self.storage_service.get_file_url(object_key)
 
 
 STORAGES_IDS_TO_SERVICES = {
@@ -40,4 +44,4 @@ def choose_storage_service(default: StoragesIDs = StoragesIDs.S3) -> BaseStorage
     return storage_service_class()
 
 
-universal_image_storage = UniversalImageStorage(storage_service=choose_storage_service())
+universal_file_storage = UniversalFileStorage(storage_service=choose_storage_service())

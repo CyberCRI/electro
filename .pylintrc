@@ -1,0 +1,16 @@
+[MAIN]
+
+max-line-length=120
+
+disable=
+    C0114,  # Missing module docstring
+    C0115,  # Missing class docstring
+    C0116,  # Missing function or method docstring
+    C0302,  # Too many lines in module
+    E0401,  # Import error: Ignored because imports actually work
+    R0801,  # Duplicate code
+    R0902,  # Too many instance attributes
+    R0903,  # Too few public methods
+    R0913,  # Too many arguments
+    R0917,  # Too many positional arguments
+    W0511,  # TODO

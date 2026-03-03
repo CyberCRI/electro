@@ -7,13 +7,11 @@ from abc import ABC, ABCMeta, abstractmethod
 
 from stringcase import snakecase
 
-from . import types_ as types
 from .contrib.storage_buckets import BaseStorageBucket, BaseStorageBucketElement
 from .flow_connector import FlowConnector, FlowConnectorEvents
 from .flow_step import BaseFlowStep, FlowStepDone
+from .models import Message
 from .scopes import FlowScopes
-
-# from decorators import forbid_concurrent_execution, with_constant_typing
 from .settings import settings
 from .substitutions import BaseSubstitution
 from .toolkit.loguru_logging import logger
@@ -24,8 +22,6 @@ STATE_SEPARATOR = ":"
 
 class FlowFinished(Exception):
     """The exception that is raised when the `Flow` is finished."""
-
-    pass
 
 
 class FlowMeta(ABCMeta):
@@ -97,8 +93,6 @@ class BaseFlow(ABC, metaclass=FlowMeta):
                 return connector.user_state
             case FlowScopes.CHANNEL:
                 return connector.channel_state
-            # case FlowScopes.GUILD:
-            #     return connector.guild_state
             case _:
                 raise ValueError(f"Unknown scope: {self._scope}. Supported scopes: {FlowScopes.__members__}")
 
@@ -109,8 +103,6 @@ class BaseFlow(ABC, metaclass=FlowMeta):
                 connector.user_state = state
             case FlowScopes.CHANNEL:
                 connector.channel_state = state
-            # case FlowScopes.GUILD:
-            #     connector.guild_state = state
             case _:
                 raise ValueError(f"Unknown scope: {self._scope}. Supported scopes: {FlowScopes.__members__}")
 
@@ -145,14 +137,12 @@ class BaseFlow(ABC, metaclass=FlowMeta):
     @abstractmethod
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    ) -> list[Message] | None:
         """Process the response in the current step of the `Flow`."""
         raise NotImplementedError
 
     @abstractmethod
-    async def run(
-        self, connector: FlowConnector, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    async def run(self, connector: FlowConnector, upper_level_state: str | None = None) -> list[Message] | None:
         """Start the `Flow`."""
         raise NotImplementedError
 
@@ -213,15 +203,13 @@ class Flow(BaseFlow):
 
     async def check_triggers(self, connector: FlowConnector, scope: FlowScopes | None = None) -> bool:
         """Check if the `Flow` can be triggered."""
-        return any([await trigger.check(connector, scope=scope) for trigger in self._triggers])
+        return any([await trigger.check(connector, scope=scope) for trigger in self._triggers])  # pylint: disable=R1729
 
     async def _update_connector_pre_run(self, connector: FlowConnector, *_, **__kwargs) -> FlowConnector | None:
         """Update the connector before running the `Flow`."""
         return connector
 
-    async def run(
-        self, connector: FlowConnector, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    async def run(self, connector: FlowConnector, upper_level_state: str | None = None) -> list[Message] | None:
         """Start the `Flow`."""
         # Make sure there are steps in the `Flow`
         if not self._steps:
@@ -240,12 +228,10 @@ class Flow(BaseFlow):
 
         return await self.step(connector, initial=True, upper_level_state=upper_level_state)
 
-    # TODO: [2024-07-19 by Mykola] Use the decorators
-    # @forbid_concurrent_execution()
-    # @with_constant_typing(run_only_on_events=[FlowConnectorEvents.MESSAGE])
+    # TODO: This is too complex and should be refactored.  pylint: disable=R0912,R0914,R0915
     async def step(
         self, connector: FlowConnector, initial: bool = False, upper_level_state: str | None = None
-    ) -> list[types.MessageToSend] | None:
+    ) -> list[Message] | None:
         """
         Process the response in the current step of the `Flow`.
 
@@ -339,7 +325,7 @@ class Flow(BaseFlow):
                     )
                 next_step_name, next_step = list(self._steps.items())[next_step_index]
                 logger.info(f"Next step name: {next_step_name} [{connector.user.id=}]")
-            except (IndexError, StopIteration):
+            except (IndexError, StopIteration) as e:
                 if (
                     (iterables := await self.get_iterables(connector))
                     # and isinstance(
@@ -353,7 +339,7 @@ class Flow(BaseFlow):
                     next_step_name, next_step = list(self._steps.items())[next_step_index]
                     logger.info(f"Next step name: {next_step_name} [{connector.user.id=}]")
                 else:
-                    raise FlowFinished()
+                    raise FlowFinished() from e
 
             # Set the state for the user
             default_state_parts: list[str] = [self._state_prefix, iterator_index, next_step_name]

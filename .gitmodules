@@ -1,3 +1,0 @@
-[submodule "migrations/electro"]
-	path = migrations/electro
-	url = https://github.com/mykolasolodukha/electro-migrations.git

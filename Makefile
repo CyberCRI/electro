@@ -15,7 +15,6 @@ style:
 	poetry run black $(SOURCES_DIR)
 	poetry run isort $(SOURCES_DIR)
 	poetry run pylint $(SOURCES_DIR)
-	poetry run pydocstyle $(SOURCES_DIR)
 
 .PHONY: docs
 docs:
