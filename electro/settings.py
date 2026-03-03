@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     SLEEP_TIME_PER_CHARACTER: float = 0.05
     HTTPX_CLIENT_DEFAULT_TIMEOUT: int = 60
     CORS_ALLOW_ORIGINS: list[str] = ["*"]  # Allow all origins by default
+    CORS_ALLOW_ORIGIN_REGEX: str | None = None  # Optional regex for allowed origins
     # Build urls for static files by removing root path and adding the server url
     SERVER_URL: str = "http://localhost:8000"
     APP_ROOT: str = "/app"
