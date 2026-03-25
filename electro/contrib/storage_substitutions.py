@@ -48,13 +48,12 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
 
         if self.ordering:
             value = (
-                await self.tortoise_model
-                .filter(**filters)
+                await self.tortoise_model.filter(**filters)
                 .order_by(self.ordering)
                 .values_list(self.tortoise_model_field_name, flat=True)
             )
         else:
-            value = await self.tortoise_model.filter(**filters).values_list(self.tortoise_model_field_name, flat=True)        
+            value = await self.tortoise_model.filter(**filters).values_list(self.tortoise_model_field_name, flat=True)
         if isinstance(value, list) and len(value) >= 1 and not self.ensure_list_result:
             return cast(str, value[0])
 
