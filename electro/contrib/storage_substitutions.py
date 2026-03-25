@@ -17,6 +17,7 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
         tortoise_model: Type[Model],
         tortoise_model_field_name: str,
         filters: dict[str, Any] | None = None,
+        ordering: str = "",
         ensure_list_result: bool = False,
         **kwargs,
     ):
@@ -24,6 +25,7 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
         self.tortoise_model = tortoise_model
         self.tortoise_model_field_name = tortoise_model_field_name
         self.filters = filters or {}
+        self.ordering = ordering
         self.ensure_list_result = ensure_list_result
 
         super().__init__(callback=self.get_value_for_connector, **kwargs)
@@ -44,9 +46,16 @@ class TortoiseModelSubstitution(CallbackSubstitution, ABC):
 
         filters: dict[str, Any] = await self.resolve_filters(flow_connector, self.filters)
 
-        value = await self.tortoise_model.filter(**filters).values_list(self.tortoise_model_field_name, flat=True)
-
-        if isinstance(value, list) and len(value) == 1 and not self.ensure_list_result:
+        if self.ordering:
+            value = (
+                await self.tortoise_model
+                .filter(**filters)
+                .order_by(self.ordering)
+                .values_list(self.tortoise_model_field_name, flat=True)
+            )
+        else:
+            value = await self.tortoise_model.filter(**filters).values_list(self.tortoise_model_field_name, flat=True)        
+        if isinstance(value, list) and len(value) >= 1 and not self.ensure_list_result:
             return cast(str, value[0])
 
         return cast(list, value)
