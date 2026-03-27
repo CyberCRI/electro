@@ -179,6 +179,7 @@ class BaseInterface(ABC):
                 processed_files = []
 
             data = {
+                "id": message.id,
                 "user": user_data,
                 "channel": channel_data,
                 "message": message_chunk,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import pathlib
 import typing
 from abc import ABC, abstractmethod
@@ -424,21 +423,10 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
     chat_completion_model: str | None = None
 
     message_prompt: TranslatedString | None = None
-    response_message_prompt: TranslatedString | None = None
-
     response_format: ChatGPTResponseFormat | str = ChatGPTResponseFormat.AUTO
-
-    save_prompt_response_to_storage: StorageBucketElement | None = None
-    parse_json_before_saving: bool | None = None
 
     async def _get_formatted_message(self, message: TranslatedString | str, connector: FlowConnector, **kwargs) -> str:
         """Get the formatted message."""
-        if not self.message_prompt:
-            return await super()._get_formatted_message(message, connector, **kwargs)
-
-        # Send the typing indicator
-        # await connector.interface.set_typing(connector.user, connector.channel, action=ResponseTypes.START_TYPING)
-
         prompt_response = await self.get_response_from_chat_gpt(
             await super()._get_formatted_message(self.message_prompt, connector, **kwargs),
             self.openai_client,
@@ -446,27 +434,7 @@ class ChatGPTRequestMessageFlowStep(MessageFlowStep, ChatGPTMixin):
             response_format=self.response_format,
         )
 
-        if self.save_prompt_response_to_storage:
-            response_to_save = prompt_response
-
-            # Try to parse the JSON response before saving
-            if self.parse_json_before_saving or (  # Parse JSON if the flag is set
-                # Or if the response format is JSON and the flag is not set (default) and `!= False` (explicitly set)
-                self.parse_json_before_saving is None
-                and self.response_format == ChatGPTResponseFormat.JSON_OBJECT
-            ):
-                try:
-                    response_to_save: typing.Any = json.loads(prompt_response)
-                    logger.debug(f"Parsed the `{self.__class__.__name__}` JSON response: {response_to_save=}")
-                except json.JSONDecodeError:
-                    logger.exception(
-                        f"Failed to parse `{self.__class__.__name__}` the JSON response: {prompt_response=}. "
-                        f"Saving as a string."
-                    )
-
-            await self.save_prompt_response_to_storage.set_data(response_to_save)
-
-        return await super()._get_formatted_message(message, connector, prompt_response=prompt_response, **kwargs)
+        return await super()._get_formatted_message(prompt_response, connector, **kwargs)
 
 
 @dataclass
