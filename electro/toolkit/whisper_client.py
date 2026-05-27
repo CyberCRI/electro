@@ -1,6 +1,5 @@
 """Whisper client utility for audio transcription."""
 
-import logging
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -8,14 +7,12 @@ from typing import Optional
 from fastapi import HTTPException, UploadFile
 from openai import AsyncOpenAI
 
+from electro.settings import settings
 from electro.toolkit.loguru_logging import logger
-from settings import settings
 
 
 class WhisperTranscriptionError(Exception):
     """Custom exception for Whisper transcription errors."""
-
-    pass
 
 
 async def validate_audio_file(file: UploadFile) -> None:
@@ -97,7 +94,7 @@ async def transcribe_audio(
                         "duration": getattr(transcript, "duration", None),
                         "filename": file.filename,
                     }
-                elif response_format == "verbose_json":
+                if response_format == "verbose_json":
                     return {
                         "text": transcript.text,
                         "language": getattr(transcript, "language", None),
@@ -105,16 +102,15 @@ async def transcribe_audio(
                         "segments": getattr(transcript, "segments", []),
                         "filename": file.filename,
                     }
-                else:
-                    return {"text": str(transcript), "filename": file.filename}
+                return {"text": str(transcript), "filename": file.filename}
 
         except Exception as e:
             logger.error(f"Transcription failed for file {file.filename}: {str(e)}")
-            raise WhisperTranscriptionError(f"Transcription failed: {str(e)}")
+            raise WhisperTranscriptionError(f"Transcription failed: {str(e)}") from e
 
         finally:
             # Clean up temporary file
             try:
                 Path(temp_file.name).unlink(missing_ok=True)
-            except Exception as cleanup_error:
+            except Exception as cleanup_error:  # pylint: disable=W0718
                 logger.warning(f"Failed to cleanup temporary file: {cleanup_error}")
