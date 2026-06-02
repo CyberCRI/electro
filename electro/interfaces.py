@@ -47,7 +47,8 @@ class BaseInterface(ABC):
                 style=button.style,
                 label=label,
                 remove_after_click=button.remove_after_click,
-                remove_neighbors_after_click=getattr(button, "remove_neighbors_after_click", False),
+                remove_neighbors_after_click=button.remove_neighbors_after_click,
+                disabled=button.disabled,
                 extra_data=getattr(button, "extra_data", {}),
             )
             response.append(
@@ -59,6 +60,7 @@ class BaseInterface(ABC):
                     "clicked": button_object.clicked,
                     "remove_after_click": button_object.remove_after_click,
                     "remove_neighbors_after_click": button_object.remove_neighbors_after_click,
+                    "disabled": button_object.disabled,
                 }
             )
         return response
