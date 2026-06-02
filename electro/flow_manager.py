@@ -86,6 +86,12 @@ class AnalyticsManager(ContextInstanceMixin):
         button = await Button.get(id=button_id)
         if button.clicked and button.remove_after_click:
             raise DisabledButtonClick
+        neighbor_buttons = await Button.filter(message_id=button.message_id)
+        if any(
+            (neighbor_button.clicked and neighbor_button.remove_neighbors_after_click)
+            for neighbor_button in neighbor_buttons
+        ):
+            raise DisabledButtonClick
         button.clicked = True
         await button.save()
         return button

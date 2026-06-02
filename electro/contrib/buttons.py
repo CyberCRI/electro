@@ -39,7 +39,8 @@ class BaseButton(ABC):
         label: str | TranslatedString | None = None,
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
-        remove_after_click: bool = False,
+        remove_after_click: bool = True,
+        remove_neighbors_after_click: bool = True,
     ):
         if label and len(str(label)) > 80:
             raise ValueError("label must be 80 characters or fewer")
@@ -49,6 +50,7 @@ class BaseButton(ABC):
         self.custom_id = str(uuid.uuid4())
         self.disabled = disabled
         self.remove_after_click = remove_after_click
+        self.remove_neighbors_after_click = remove_neighbors_after_click
 
 
 class DataButton(BaseButton):
@@ -59,10 +61,11 @@ class DataButton(BaseButton):
         label: str | TranslatedString | None = None,
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
-        remove_after_click: bool = False,
+        remove_after_click: bool = True,
+        remove_neighbors_after_click: bool = True,
         **kwargs,
     ):
-        super().__init__(label, style, disabled, remove_after_click)
+        super().__init__(label, style, disabled, remove_after_click, remove_neighbors_after_click)
         self.extra_data = kwargs
 
 
@@ -121,9 +124,15 @@ class ConfirmButton(ActionButton):
         style: ButtonStyle = ButtonStyle.PRIMARY,
         disabled: bool = False,
         remove_after_click: bool = True,
+        remove_neighbors_after_click: bool = True,
     ):
         super().__init__(
-            label=label, style=style, action_callback=None, disabled=disabled, remove_after_click=remove_after_click
+            label=label,
+            style=style,
+            action_callback=None,
+            disabled=disabled,
+            remove_after_click=remove_after_click,
+            remove_neighbors_after_click=remove_neighbors_after_click,
         )
 
     async def trigger_action(self, flow_connector: FlowConnector):
