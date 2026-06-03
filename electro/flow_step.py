@@ -18,7 +18,7 @@ from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.decorators import with_constant_typing
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
-from .toolkit.i18n import resolve_translation, TranslatedString
+from .toolkit.i18n import resolve_translation, TranslatedString, _
 from .toolkit.loguru_logging import logger
 
 if typing.TYPE_CHECKING:
@@ -276,7 +276,11 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
                 return
             if not button:
                 logger.error(f"Cannot find the button with custom id {connector.button.custom_id} in {self.buttons=}")
-                return
+                return await connector.interface.send_message(
+                    "This button is outdated, click on the reload last message option",
+                    connector.user,
+                    connector.channel
+                )
             return await button[0].trigger_action(connector)
 
         # TODO: [23.11.2023 by Mykola] Use Whisper to transcribe the audio message into text

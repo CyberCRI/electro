@@ -20,6 +20,8 @@ async def format_historical_message(message: Message) -> Dict[str, Any]:
             "label": button.label,
             "clicked": button.clicked,
             "remove_after_click": button.remove_after_click,
+            "remove_neighbors_after_click": button.remove_neighbors_after_click,
+            "disabled": button.disabled,
         }
         for button in message.buttons
     ]

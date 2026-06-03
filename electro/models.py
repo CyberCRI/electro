@@ -162,7 +162,9 @@ class Button(BaseModel):
     style = fields.IntField()
     label = fields.CharField(max_length=255)
     clicked = fields.BooleanField(default=False)
-    remove_after_click = fields.BooleanField(default=False)
+    remove_after_click = fields.BooleanField(default=True)
+    remove_neighbors_after_click = fields.BooleanField(default=True)
+    disabled = fields.BooleanField(default=False)
     extra_data = fields.JSONField(null=True)
     message: ForeignKeyRelation[Message] = fields.ForeignKeyField("electro.Message", related_name="buttons", null=True)
 
