@@ -18,7 +18,7 @@ from .settings import settings
 from .substitutions import BaseSubstitution, GlobalAbstractChannel, resolve_channel
 from .toolkit.decorators import with_constant_typing
 from .toolkit.files_storage.universal_file_storage import universal_file_storage
-from .toolkit.i18n import resolve_translation, TranslatedString, _
+from .toolkit.i18n import resolve_translation, TranslatedString
 from .toolkit.loguru_logging import logger
 
 if typing.TYPE_CHECKING:
