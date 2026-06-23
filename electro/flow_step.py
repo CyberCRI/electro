@@ -279,7 +279,7 @@ class MessageFlowStep(BaseFlowStep, FilesMixin, MessageFormatterMixin):
                 return await connector.interface.send_message(
                     "This button is outdated, click on the reload last message option",
                     connector.user,
-                    connector.channel
+                    connector.channel,
                 )
             return await button[0].trigger_action(connector)
 

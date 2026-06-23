@@ -88,7 +88,7 @@ class AnalyticsManager(ContextInstanceMixin):
             raise DisabledButtonClick
         if button.clicked and button.remove_after_click:
             raise DisabledButtonClick
-        neighbor_buttons = await Button.filter(message_id=button.message_id)
+        neighbor_buttons = await Button.filter(message_id=button.message_id, message_id__isnull=False)
         if any(
             (neighbor_button.clicked and neighbor_button.remove_neighbors_after_click)
             for neighbor_button in neighbor_buttons
